@@ -1,3 +1,5 @@
+cchat-server
+cchat-client
 client
 server
 *.o

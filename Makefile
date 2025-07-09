@@ -1,10 +1,10 @@
-all: client server
+all: cchat-client cchat-server
 
-client: client.c
-	$(CC) -o client client.c
+cchat-client: client.c
+	$(CC) -o cchat-client client.c
 
-server: server.c
-	$(CC) -o server server.c
+cchat-server: server.c
+	$(CC) -o cchat-server server.c
 
 clean:
-	rm -f *.o *.d client server
+	rm -f *.o *.d cchat-client cchat-server
