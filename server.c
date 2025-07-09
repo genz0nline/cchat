@@ -18,19 +18,11 @@ int sock_init() {
 }
 
 void sock_bind(int fd) {
-
-    char *s_addr = "127.0.0.1";
-    int port = 8000;
-
-    struct sockaddr_in server_addr = {
-        .sin_family = AF_INET,
-        .sin_port = htons(port),
-    };
-    inet_aton(s_addr, &server_addr.sin_addr);
+    struct sockaddr_in server_addr = get_localhost_addr(8000);
 
     if (bind(fd, (struct sockaddr *) &server_addr, sizeof(server_addr)) == -1)
         die("bind");
-    print_log("socket %d was bound to %s:%d\n", fd, s_addr, port);
+    print_log("socket %d was bound to %s:%d\n", fd, inet_ntoa(server_addr.sin_addr), htons(server_addr.sin_port));
 }
 
 void sock_listen(int fd) {
@@ -68,7 +60,5 @@ void startup_server() {
 /*** main ***/
 
 int main(void) {
-
     startup_server();
-
 }

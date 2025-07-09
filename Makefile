@@ -6,7 +6,6 @@ CLIENT_DEPS = client.c
 SERVER_DEPS += $(COMMON_DEPS)
 CLIENT_DEPS += $(COMMON_DEPS)
 
-
 cchat-server: $(SERVER_DEPS)
 	$(CC) -o cchat-server $(SERVER_DEPS)
 

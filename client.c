@@ -15,17 +15,9 @@ int sock_init() {
 }
 
 void sock_connect(int fd) {
-    char *s_addr = "127.0.0.1";
-    int port = 8000;
-
-    struct sockaddr_in server_addr = {
-        .sin_family = AF_INET,
-        .sin_port = htons(port),
-    };
-    inet_aton(s_addr, &server_addr.sin_addr);
+    struct sockaddr_in server_addr = get_localhost_addr(8000);
 
     socklen_t len = sizeof(server_addr);
-
     if (connect(fd, (struct sockaddr *)&server_addr, len) == -1) die("connect");
     print_log("socket %d connected to %s\n", fd, inet_ntoa(server_addr.sin_addr));
 }
