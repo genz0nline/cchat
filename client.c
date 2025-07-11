@@ -1,9 +1,21 @@
 #include <arpa/inet.h>
+#include <netinet/in.h>
 #include <sys/socket.h>
+#include <unistd.h>
+#include <sys/time.h>
 
 #include "utils.h"
 
 const char *app_name = "cchat-client";
+
+/*** messaging ***/
+
+void spam(int socket) {
+    while (1) {
+        sock_send(socket, "Hello, server! I am client!");
+        sleep(1);
+    }
+}
 
 /*** sockets ***/
 
@@ -28,6 +40,8 @@ void client_connect() {
     int client_socket = sock_init();
 
     sock_connect(client_socket);
+
+    spam(client_socket);
 }
 
 int main(void) {

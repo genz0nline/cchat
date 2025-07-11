@@ -1,5 +1,8 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <stdio.h>
 #include <sys/socket.h>
 #include <netdb.h>
 #include <stdarg.h>
@@ -7,6 +10,17 @@
 #include "utils.h"
 
 const char *app_name = "cchat-server";
+
+/*** messaging ***/
+
+void handle_client_connection(int client) {
+    while (1) {
+        char *message = sock_recv(client);
+        if (message)
+            printf("%s\n", message);
+        free(message);
+    }
+}
 
 /*** sockets ***/
 
@@ -40,8 +54,12 @@ void sock_accept(int fd) {
         int client_fd = accept(fd, (struct sockaddr *)&addr, &addr_len);
         if (client_fd == -1)
             print_log("socket %d failed to accept a connection\n");
+
         char *s = inet_ntoa(addr.sin_addr);
         print_log("socket %d accepted connection from %s\n", fd, s);
+
+        handle_client_connection(client_fd);
+
     }
 }
 
