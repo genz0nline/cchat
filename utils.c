@@ -18,20 +18,22 @@ void sock_send(int socket, char *message) {
     unsigned char serialized_len[MESSAGELEN_BUFLEN];
     serialize_len(serialized_len, htons(len));
 
-    write(socket, serialized_len, MESSAGELEN_BUFLEN);
-    write(socket, message, len);
+    if (send(socket, serialized_len, MESSAGELEN_BUFLEN, 0) != MESSAGELEN_BUFLEN) return;
+    if (send(socket, message, len, 0) != len) return;
+
+    print_log("sent %d bytes\n", strlen(message));
 }
 
 char *sock_recv(int socket) {
     unsigned char buf[2];
     messagelen_t len;
 
-    read(socket, buf, 2);
+    if (recv(socket, buf, MESSAGELEN_BUFLEN, 0) < MESSAGELEN_BUFLEN) return NULL;
     len = ntohs(deserealize_len(buf));
 
     if (len > 0) {
         char *message = malloc(len);
-        read(socket, message, len);
+        if (recv(socket, message, len, 0) < len) return NULL;
         return message;
     } else {
         return NULL;
