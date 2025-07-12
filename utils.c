@@ -98,6 +98,7 @@ struct sockaddr_in get_localhost_addr(int port) {
 /*** error handling ***/
 
 void die(const char *s) {
+    print_log("death - ");
     perror(s);
     exit(EXIT_FAILURE);
 }
