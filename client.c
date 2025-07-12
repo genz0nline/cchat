@@ -16,36 +16,42 @@ char *message = NULL;
 
 /*** global data ***/
 
-typedef struct Client {
+typedef struct CClient {
+    int connect_socket;
     pthread_t send_thread;
     pthread_t recv_thread;
-} Client;
+} CClient;
 
-Client cfg;
+CClient c_cfg;
 
 /*** messaging ***/
 
-void *send_messages(void *socket) {
-
-    int socket_fd = *(int *)socket;
-
+void *send_messages(void *p) {
     while (1) {
         if (message) {
-            sock_send(socket_fd, message);
+            sock_send(c_cfg.connect_socket, message);
             message = NULL;
         }
     }
+
+    return NULL;
 }
 
 void *gather(void *p) {
-    int server_fd = *(int *)p;
-
     while (1) {
-        char *message = sock_recv(server_fd);
-        if (message && strlen(message))
-            printf("%s", message);
+        char *message = NULL;
+        messagelen_t len;
+
+        int status = sock_recv(c_cfg.connect_socket, &message, &len);
+
+        if (status == IGNORE) continue;
+        if (status == DISCON) break;
+        printf("%s", message);
+
         free(message);
     }
+
+    return NULL;
 }
 
 /*** sockets ***/
@@ -57,12 +63,12 @@ int sock_init() {
     return fd;
 }
 
-void sock_connect(int fd) {
+void sock_connect() {
     struct sockaddr_in server_addr = get_localhost_addr(8000);
 
     socklen_t len = sizeof(server_addr);
-    if (connect(fd, (struct sockaddr *)&server_addr, len) == -1) die("connect");
-    print_log("socket %d connected to %s\n", fd, inet_ntoa(server_addr.sin_addr));
+    if (connect(c_cfg.connect_socket, (struct sockaddr *)&server_addr, len) == -1) die("connect");
+    print_log("socket %d connected to %s\n", c_cfg.connect_socket, inet_ntoa(server_addr.sin_addr));
 }
 
 /*** input ***/
@@ -70,8 +76,6 @@ void sock_connect(int fd) {
 int get_message(char *buf, size_t buflen) {
 
     int n = getline(&buf, &buflen, stdin);
-
-    while (n > 0 && strchr("\r\n", buf[n-1])) n--;
 
     if (n > 0) {
         message = buf;
@@ -83,12 +87,12 @@ int get_message(char *buf, size_t buflen) {
 /*** client ***/
 
 void client_connect() {
-    int connect_socket = sock_init();
+    c_cfg.connect_socket = sock_init();
 
-    sock_connect(connect_socket);
+    sock_connect();
 
-    pthread_create(&cfg.send_thread, NULL, send_messages, (void *)&connect_socket);
-    pthread_create(&cfg.recv_thread, NULL, gather, (void *)&connect_socket);
+    pthread_create(&c_cfg.send_thread, NULL, send_messages, NULL);
+    pthread_create(&c_cfg.recv_thread, NULL, gather, NULL);
 
 }
 
@@ -97,8 +101,10 @@ int main(int argc, char *argv[]) {
 
     client_connect();
 
-    while (get_message(buf, 128) >= 0);
+    while (get_message(buf, 128));
 
-    pthread_join(cfg.send_thread, NULL);
-    pthread_join(cfg.recv_thread, NULL);
+    close(c_cfg.connect_socket);
+
+    pthread_join(c_cfg.send_thread, NULL);
+    pthread_join(c_cfg.recv_thread, NULL);
 }

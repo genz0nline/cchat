@@ -1,4 +1,5 @@
 #include <arpa/inet.h>
+#include <errno.h>
 #include <string.h>
 #include <unistd.h>
 #include <netinet/in.h>
@@ -12,32 +13,59 @@
 
 /*** messaging ***/
 
-void sock_send(int socket, char *message) {
-    messagelen_t len = strlen(message);
+int sock_send(int socket, char *message) {
+    messagelen_t len = strlen(message) + 1;
 
     unsigned char serialized_len[MESSAGELEN_BUFLEN];
     serialize_len(serialized_len, htons(len));
 
-    if (send(socket, serialized_len, MESSAGELEN_BUFLEN, 0) != MESSAGELEN_BUFLEN) return;
-    if (send(socket, message, len, 0) != len) return;
+    print_log("len = %u, serialized_len = %u\n", len, serialized_len);
 
-    print_log("sent %d bytes\n", strlen(message));
+    int result = send(socket, serialized_len, MESSAGELEN_BUFLEN, 0);
+
+    if (result < 0) {
+        if (errno == EPIPE) return DISCON;
+        return IGNORE;
+    }
+
+    result = send(socket, message, len, 0);
+
+    if (result < 0) {
+        if (errno == EPIPE) return DISCON;
+        return IGNORE;
+    }
+
+    print_log("sent %d bytes\n", result);
+
+    return SUCCESS;
 }
 
-char *sock_recv(int socket) {
+int sock_recv(int socket, char **message, messagelen_t *len) {
     unsigned char buf[2];
-    messagelen_t len;
 
-    if (recv(socket, buf, MESSAGELEN_BUFLEN, 0) < MESSAGELEN_BUFLEN) return NULL;
-    len = ntohs(deserealize_len(buf));
+    int n = recv(socket, buf, MESSAGELEN_BUFLEN, 0);
 
-    if (len > 0) {
-        char *message = malloc(len);
-        if (recv(socket, message, len, 0) < len) return NULL;
-        return message;
-    } else {
-        return NULL;
+    if (n < 0) {
+        return IGNORE;
+    } else if (n == 0) {
+        return DISCON;
     }
+
+    *len = ntohs(deserealize_len(buf));
+
+    *message = realloc(*message, *len);
+    n = recv(socket, *message, *len, 0);
+    if (n < 0) {
+        return IGNORE;
+    } else if (n == 0) {
+        return DISCON;
+    } else if (n < *len) {
+        *len = n;
+    }
+
+    print_log("received %d bytes\n", *len);
+
+    return SUCCESS;
 }
 
 /*** serialization ***/

@@ -18,7 +18,13 @@ struct sockaddr_in get_localhost_addr(int port);
 void serialize_len(unsigned char buf[MESSAGELEN_BUFLEN], messagelen_t num);
 messagelen_t deserealize_len(unsigned char *buf);
 
-void sock_send(int socket, char *message);
-char *sock_recv(int socket);
+enum status {
+    SUCCESS = 0,
+    DISCON, // disconnected
+    IGNORE, // anything else, can be ignored for now
+};
+
+int sock_send(int socket, char *message);
+int sock_recv(int socket, char **message, messagelen_t *len);
 
 #endif // UTILS_h_
