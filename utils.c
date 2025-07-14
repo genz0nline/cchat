@@ -1,6 +1,7 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <string.h>
+#include <sys/types.h>
 #include <unistd.h>
 #include <netinet/in.h>
 #include <stdio.h>
@@ -105,14 +106,15 @@ void die(const char *s) {
 
 /*** time ***/
 
-void get_current_time(char *s) {
+void get_current_time(char *s, char delim) {
     time_t t = time(NULL);
     struct tm tm = *localtime(&t);
 
-    sprintf(s, "%.4d-%.2d-%.2d %.2d:%.2d:%.2d",
+    sprintf(s, "%.4d-%.2d-%.2d%c%.2d:%.2d:%.2d",
                     tm.tm_year + 1900,
                     tm.tm_mon + 1,
                     tm.tm_mday,
+                    delim,
                     tm.tm_hour,
                     tm.tm_min,
                     tm.tm_sec);
@@ -122,10 +124,10 @@ void get_current_time(char *s) {
 /*** logging ***/
 
 void print_log(char *fmt, ...) {
-    char s[20];
-    get_current_time(s);
+    char time[20];
+    get_current_time(time, ' ');
 
-    fprintf(stderr, "\x1b[33m%s %s |\x1b[39m ", s, app_name);
+    fprintf(stderr, "\x1b[33m%s %s |\x1b[39m ", time, app_name);
 
     va_list ap;
     va_start(ap, fmt);

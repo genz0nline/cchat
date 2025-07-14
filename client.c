@@ -104,7 +104,6 @@ int main(int argc, char *argv[]) {
     while (get_message(buf, 128));
 
     close(c_cfg.connect_socket);
-
     pthread_join(c_cfg.send_thread, NULL);
     pthread_join(c_cfg.recv_thread, NULL);
 }

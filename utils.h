@@ -11,7 +11,7 @@ typedef uint16_t messagelen_t;
 #define MESSAGELEN_BUFLEN   2
 
 void die(const char *s);
-void get_current_time(char *s);
+void get_current_time(char *s, char delim);
 void print_log(char *fmt, ...);
 struct sockaddr_in get_localhost_addr(int port);
 

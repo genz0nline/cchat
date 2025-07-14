@@ -1,6 +1,6 @@
 #include <netinet/in.h>
+#include <errno.h>
 #include <arpa/inet.h>
-#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -8,6 +8,8 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <stdarg.h>
+
+#include <sys/time.h>
 #include <pthread.h>
 
 #include "utils.h"
@@ -25,7 +27,7 @@ typedef struct SClient {
 typedef struct Chatroom {
     int server_fd;
     pthread_t accept_thread;
-    SClient *clients;
+    SClient **clients;
     int clients_len;
     int clients_size;
 } Chatroom;
@@ -45,10 +47,10 @@ void broadcast_message(int client_from, char *message) {
     
     print_log("broadcasting message from %d\n", client_from);
     for (int i = 0; i < s_cfg.clients_len; i++) {
-        client_to = s_cfg.clients[i].fd;
-        if (client_to != client_from && !s_cfg.clients[i].closed) {
+        client_to = s_cfg.clients[i]->fd;
+        if (client_to != client_from && !s_cfg.clients[i]->closed) {
             print_log("\tsending message %s to %d\n", message, client_to);
-            sock_send(s_cfg.clients[i].fd, message);
+            sock_send(s_cfg.clients[i]->fd, message);
         }
     }
 }
@@ -61,12 +63,15 @@ void *handle_client_connection(void *client) {
         messagelen_t len;
 
         int status = sock_recv(client_ptr->fd, &message, &len);
+        print_log("client_ptr->fd = %d\n", client_ptr->fd);
+        sleep(1);
 
         if (status == DISCON) {
             print_log("client %d was disconnected\n", client_ptr->fd);
             client_ptr->closed = 1;
             break;
         } else if (status == IGNORE) {
+            print_log("error occured %s\n", strerror(errno));
             continue;
         } else if (status == SUCCESS) {
             broadcast_message(client_ptr->fd, message);
@@ -114,17 +119,21 @@ void *sock_accept(void *p) {
         }
 
         if (s_cfg.clients_len == s_cfg.clients_size) {
-            s_cfg.clients = (SClient *)realloc(s_cfg.clients, sizeof(SClient) * (s_cfg.clients_size * 2 + 1));
+            s_cfg.clients = (SClient **)realloc(s_cfg.clients, sizeof(SClient *) * (s_cfg.clients_size * 2 + 1));
             s_cfg.clients_size = s_cfg.clients_size * 2 + 1;
         }
 
-        s_cfg.clients[s_cfg.clients_len].fd = new_socket;
-        s_cfg.clients[s_cfg.clients_len].closed = 0;
+        SClient *new_client = (SClient *)malloc(sizeof(SClient));
+
+        new_client->fd = new_socket;
+        new_client->closed = 0;
+
+        s_cfg.clients[s_cfg.clients_len] = new_client;
 
         char *s = inet_ntoa(addr.sin_addr);
         print_log("socket %d accepted connection from %s\n", s_cfg.server_fd, s);
 
-        pthread_create(&s_cfg.clients[s_cfg.clients_len].thread, NULL, (void *(*)(void *))handle_client_connection, (void *)&s_cfg.clients[s_cfg.clients_len]);
+        pthread_create(&new_client->thread, NULL, (void *(*)(void *))handle_client_connection, (void *)s_cfg.clients[s_cfg.clients_len]);
 
         s_cfg.clients_len++;
     }
@@ -151,6 +160,15 @@ void startup_server() {
     sock_listen();
 
     pthread_create(&s_cfg.accept_thread, NULL, (void *(*)(void *))sock_accept, NULL);
+
+    while (1) {
+        char c;
+        read(STDIN_FILENO, &c, 1);
+        if (c == 'q') {
+            cleanup();
+            exit(0);
+        }
+    }
 
     pthread_join(s_cfg.accept_thread, NULL);
 }
