@@ -1,4 +1,5 @@
 #include "log.h"
+#include <pthread.h>
 #include <stdarg.h>
 #include <errno.h>
 #include <dirent.h>
@@ -8,8 +9,9 @@
 #include <stdio.h>
 #include <time.h>
 
-char *log_file_path = NULL;
+pthread_mutex_t log_mutex;
 
+char *log_file_path = NULL;
 char *subdir_name = "/.local/state/cchat/";
 
 int create_log_dir_if_not_exist(char *log_dir) {
@@ -94,6 +96,9 @@ int create_log_file(char *dir) {
 }
 
 int log_init() {
+
+    pthread_mutex_init(&log_mutex, NULL);
+
     char *base_log_dir = getenv("HOME");
 
     size_t base_log_dir_len = strlen(base_log_dir);
@@ -135,6 +140,7 @@ void log_cleanup() {
 }
 
 void log_print(char *fmt, ...) {
+    pthread_mutex_lock(&log_mutex);
     FILE *fp = fopen(log_file_path, "a");
 
     char *time = get_current_time(' ');
@@ -147,5 +153,9 @@ void log_print(char *fmt, ...) {
 
     fprintf(fp, fmt, ap);
     fclose(fp);
+    pthread_mutex_unlock(&log_mutex);
 }
 
+void log_perror(char *s) {
+    log_print("%s: %s\n", s, strerror(errno));
+}

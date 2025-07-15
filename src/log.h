@@ -3,6 +3,7 @@
 
 int log_init();
 
+void log_perror(char *s);
 void log_print(char *fmt, ...);
 void log_cleanup();
 

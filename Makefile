@@ -1,6 +1,6 @@
 all: cchat
 
-SRC=src/cchat.c src/log.c
+SRC=src/cchat.c src/log.c src/terminal.c src/input.c src/err.c src/abuf.c src/tui.c src/network.c
 
 cchat: $(SRC)
 	$(CC) -o cchat $(SRC)
