@@ -1,4 +1,5 @@
 #include <netinet/in.h>
+#include <signal.h>
 #include <errno.h>
 #include <arpa/inet.h>
 #include <stdlib.h>
@@ -63,8 +64,6 @@ void *handle_client_connection(void *client) {
         messagelen_t len;
 
         int status = sock_recv(client_ptr->fd, &message, &len);
-        print_log("client_ptr->fd = %d\n", client_ptr->fd);
-        sleep(1);
 
         if (status == DISCON) {
             print_log("client %d was disconnected\n", client_ptr->fd);
@@ -142,16 +141,28 @@ void *sock_accept(void *p) {
 /*** cleanup ***/
 
 void cleanup() {
+
+    for (int i = 0; i < s_cfg.clients_len; i++) {
+        pthread_cancel(s_cfg.clients[i]->thread);
+        close(s_cfg.clients[i]->fd);
+        free(s_cfg.clients[i]);
+    }
+
+    pthread_cancel(s_cfg.accept_thread);
+
     close(s_cfg.server_fd);
     free(s_cfg.clients);
+}
+
+void sig_handler(int sig) {
+    cleanup();
+    exit(sig);
 }
 
 /*** server ***/
 
 void startup_server() {
     cr_init();
-
-    atexit(cleanup);
 
     s_cfg.server_fd = sock_init();
 
@@ -161,20 +172,14 @@ void startup_server() {
 
     pthread_create(&s_cfg.accept_thread, NULL, (void *(*)(void *))sock_accept, NULL);
 
-    while (1) {
-        char c;
-        read(STDIN_FILENO, &c, 1);
-        if (c == 'q') {
-            cleanup();
-            exit(0);
-        }
-    }
-
     pthread_join(s_cfg.accept_thread, NULL);
 }
 
 /*** main ***/
 
 int main(void) {
+    signal(SIGINT, sig_handler);
+    signal(SIGSEGV, sig_handler);
+
     startup_server();
 }
