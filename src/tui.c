@@ -48,11 +48,41 @@ void draw_mode_menu(abuf *ab) {
     }
 }
 
+void draw_prepare_host_menu(abuf *ab) {
+    char *ui = "prepare host";
+    draw_centered(ab, ui, strlen(ui));
+}
+
+void draw_prepare_connect_menu(abuf *ab) {
+    char *ui = "prepare connect";
+    draw_centered(ab, ui, strlen(ui));
+}
+
+void draw_chatroom_ui(abuf *ab) {
+    char *ui = "chatroom ui";
+    char *mode = C.mode == CONNECT ? "connect" : "host";
+    draw_centered(ab, ui, strlen(ui));
+    draw_centered(ab, mode, strlen(mode));
+}
+
 void draw_interface(abuf *ab) {
 
-    if (C.mode == UNDEFINED) {
-        draw_mode_menu(ab);
+    switch (C.mode) {
+        case UNDEFINED:
+            draw_mode_menu(ab);
+            break;
+        case PREPARE_HOST:
+            draw_prepare_host_menu(ab);
+            break;
+        case HOST:
+            draw_chatroom_ui(ab);
+            break;
+        case PREPARE_CONNECT:
+            draw_prepare_host_menu(ab);
+            break;
+        case CONNECT:
+            draw_chatroom_ui(ab);
+            break;
     }
-
 }
 

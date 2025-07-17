@@ -5,7 +5,9 @@
 
 typedef enum {
     UNDEFINED,
+    PREPARE_HOST,
     HOST,
+    PREPARE_CONNECT,
     CONNECT,
 } chat_mode;
 

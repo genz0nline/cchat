@@ -15,6 +15,7 @@ void chat_init() {
 int main(void) {
 
     chat_init();
+    atexit(log_cleanup);
 
     if (log_init()) {
         printf("Couldn't initialize logger\n");

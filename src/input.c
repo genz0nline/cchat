@@ -28,28 +28,88 @@ int get_key() {
     }
 }
 
+void process_keypress_undefined_mode(int key) {
+    switch (key) {
+        case 'q':
+            exit(0);
+        case 'h':
+            C.mode = PREPARE_HOST;
+            break;
+        case 'c':
+            C.mode = PREPARE_CONNECT;
+            break;
+        default:
+            break;
+    }
+}
+
+void process_keypress_prepare_host_mode(int key) {
+    switch (key) {
+        case 'q':
+            C.mode = UNDEFINED;
+            break;
+        case '\r':
+            C.mode = HOST;
+            break;
+        default:
+            break;
+    }
+}
+
+void process_keypress_prepare_connect_mode(int key) {
+    switch (key) {
+        case 'q':
+            C.mode = UNDEFINED;
+            break;
+        case '\r':
+            C.mode = CONNECT;
+            break;
+        default:
+            break;
+    }
+}
+
+void process_keypress_host_mode(int key) {
+    switch (key) {
+        case 'q':
+            C.mode = UNDEFINED;
+            break;
+        default:
+            break;
+    }
+}
+
+void process_keypress_connect_mode(int key) {
+    switch (key) {
+        case 'q':
+            C.mode = UNDEFINED;
+            break;
+        default:
+            break;
+    }
+}
+
 void process_keypress() {
     char *buf;
 
     int key = get_key();
     if (key == -1) return;
 
-    if (C.mode == UNDEFINED) {
-        switch (key) {
-            case 'q':
-                exit(0);
-            case 'h':
-                pthread_create(&C.accept_thread, NULL, host_chat, NULL);
-                break;
-            case 'c':
-                pthread_create(&C.accept_thread, NULL, connect_to_chat, NULL);
-                C.mode = CONNECT;
-                break;
-        }
-    } else {
-        switch (key) {
-            case 'q':
-                C.mode = UNDEFINED;
-        }
+    switch (C.mode) {
+        case UNDEFINED:
+            process_keypress_undefined_mode(key);
+            break;
+        case PREPARE_HOST:
+            process_keypress_prepare_host_mode(key);
+            break;
+        case HOST:
+            process_keypress_host_mode(key);
+            break;
+        case PREPARE_CONNECT:
+            process_keypress_prepare_connect_mode(key);
+            break;
+        case CONNECT:
+            process_keypress_connect_mode(key);
+            break;
     }
 }
