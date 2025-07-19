@@ -78,7 +78,7 @@ void draw_interface(abuf *ab) {
             draw_chatroom_ui(ab);
             break;
         case PREPARE_CONNECT:
-            draw_prepare_host_menu(ab);
+            draw_prepare_connect_menu(ab);
             break;
         case CONNECT:
             draw_chatroom_ui(ab);

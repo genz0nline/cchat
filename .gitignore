@@ -1,3 +1,6 @@
+client-logs/
+server-logs/
+log.txt
 cchat
 *.o
 *.d

@@ -69,8 +69,15 @@ char *get_log_file_name() {
     return buf;
 }
 
-int create_log_file(char *dir) {
-    char *file_name = get_log_file_name();
+int create_log_file(char *dir, int dev) {
+
+    char *file_name;
+
+    if (dev) {
+        file_name = "log.txt";
+    } else {
+        file_name = get_log_file_name();
+    }
 
     size_t dir_len = strlen(dir);
     size_t file_name_len = strlen(file_name);
@@ -80,7 +87,8 @@ int create_log_file(char *dir) {
     memcpy(path, dir, dir_len);
     memcpy(path + dir_len, file_name, file_name_len);
     path[dir_len + file_name_len] = '\0';
-    free(file_name);
+    if (!dev)
+        free(file_name);
     
     FILE *fp = fopen(path, "w");
     if (fp) {
@@ -95,9 +103,18 @@ int create_log_file(char *dir) {
     return 0;
 }
 
-int log_init() {
+int log_init(int dev) {
 
     pthread_mutex_init(&log_mutex, NULL);
+
+    if (dev) {
+        if (create_log_file("./", dev)) {
+            printf("Couldn't create log file\n");
+            return 1;
+        }
+
+        return 0;
+    }
 
     char *base_log_dir = getenv("HOME");
 
@@ -125,7 +142,7 @@ int log_init() {
         return 1;
     }
 
-    if (create_log_file(log_dir)) {
+    if (create_log_file(log_dir, dev)) {
         printf("Couldn't create log file\n");
         free(log_dir);
         return 1;
@@ -142,6 +159,10 @@ void log_cleanup() {
 void log_print(char *fmt, ...) {
     pthread_mutex_lock(&log_mutex);
     FILE *fp = fopen(log_file_path, "a");
+    if (!fp) {
+        pthread_mutex_unlock(&log_mutex);
+        return;
+    }
 
     char *time = get_current_time(' ');
     
@@ -150,8 +171,9 @@ void log_print(char *fmt, ...) {
 
     va_list ap;
     va_start(ap, fmt);
+    vfprintf(fp, fmt, ap);
+    va_end(ap);
 
-    fprintf(fp, fmt, ap);
     fclose(fp);
     pthread_mutex_unlock(&log_mutex);
 }

@@ -3,8 +3,8 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <errno.h>
-#include "state.h"
 #include "network.h"
+#include "state.h"
 
 enum keys {
     ESC_KEY=1000,
@@ -49,6 +49,7 @@ void process_keypress_prepare_host_mode(int key) {
             C.mode = UNDEFINED;
             break;
         case '\r':
+            pthread_create(&C.accept_thread, NULL, host_chat, NULL);
             C.mode = HOST;
             break;
         default:
@@ -72,6 +73,8 @@ void process_keypress_prepare_connect_mode(int key) {
 void process_keypress_host_mode(int key) {
     switch (key) {
         case 'q':
+            pthread_cancel(C.accept_thread);
+            pthread_join(C.accept_thread, NULL);
             C.mode = UNDEFINED;
             break;
         default:
