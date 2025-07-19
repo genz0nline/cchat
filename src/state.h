@@ -24,6 +24,7 @@ struct chat_cfg {
     int cols;
 
     char username[32];
+    char message[1024];
 
     // For server mode
     pthread_t accept_thread;

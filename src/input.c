@@ -64,6 +64,7 @@ void process_keypress_prepare_connect_mode(int key) {
             break;
         case '\r':
             C.mode = CONNECT;
+            pthread_create(&C.connect_thread, NULL, connect_to_chat, NULL);
             break;
         default:
             break;
@@ -85,6 +86,8 @@ void process_keypress_host_mode(int key) {
 void process_keypress_connect_mode(int key) {
     switch (key) {
         case 'q':
+            pthread_cancel(C.connect_thread);
+            pthread_join(C.connect_thread, NULL);
             C.mode = UNDEFINED;
             break;
         default:

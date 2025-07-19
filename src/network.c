@@ -1,10 +1,12 @@
 #include <pthread.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <string.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <sys/time.h>
 
 #include "network.h"
 #include "log.h"
@@ -17,11 +19,11 @@ void *handle_client_connection(void *p) {
 
     Client *client = (Client *)p;
 
-    char c;
+    char message[1024];
     int n;
 
-    while ((n = read(client->socket, &c, 1)) > 0) {
-        printf("%c", c);
+    while ((n = read(client->socket, message, 1024)) > 0) {
+        printf("%s\n", message);
     }
 
     if (n == 0) {
@@ -65,7 +67,7 @@ void *host_chat(void *p) {
     if (C.server_socket == -1) die("socket");
     pthread_cleanup_push(close_socket, (void *)&C.server_socket);
 
-    log_print("Created socket %d\n", C.server_socket);
+    log_print("Created accept socket %d\n", C.server_socket);
 
     struct sockaddr_in addr;
     addr.sin_family = AF_INET;
@@ -115,5 +117,29 @@ void *host_chat(void *p) {
 
 
 void *connect_to_chat(void *p) {
-    return NULL;
+
+    C.connect_socket = socket(AF_INET, SOCK_STREAM, 0);
+    if (C.connect_socket == -1) die("socket");
+
+    pthread_cleanup_push(close_socket, (void *)&C.connect_socket);
+
+    log_print("Created connect socket %d\n", C.connect_socket);
+
+    struct sockaddr_in addr;
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(PORT);
+    inet_aton("127.0.0.1", &addr.sin_addr);
+
+    if (connect(C.connect_socket, (struct sockaddr *)&addr, sizeof(addr)) == -1) die("connect");
+
+    while (1) {
+        if (strlen(C.message) > 0) {
+            if (write(C.connect_socket, C.message, 1024) <= 0) break;
+            sleep(1);
+        }
+    }
+
+    pthread_cleanup_pop(1);
+    C.mode = UNDEFINED;
+    pthread_exit(NULL);
 }

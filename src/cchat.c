@@ -1,6 +1,7 @@
 #include "input.h"
 #include "log.h"
 #include "terminal.h"
+#include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -11,6 +12,8 @@ struct chat_cfg C;
 void chat_init() {
     C.mode = UNDEFINED;
     C.clients = NULL;
+    char *message = "lorem ipsum";
+    memcpy(C.message, message, strlen(message) + 1);
     C.username[0] = '\0';
     C.clients_len = 0;
     C.clients_size = 0;
