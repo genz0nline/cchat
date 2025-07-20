@@ -1,10 +1,14 @@
 #include "input.h"
 #include "err.h"
+#include <string.h>
 #include <pthread.h>
 #include <unistd.h>
+#include "log.h"
 #include <errno.h>
 #include "network.h"
 #include "state.h"
+
+#define CTRL_KEY(k) ((k) & 0x1f)
 
 enum keys {
     ESC_KEY=1000,
@@ -30,7 +34,7 @@ int get_key() {
 
 void process_keypress_undefined_mode(int key) {
     switch (key) {
-        case 'q':
+        case CTRL_KEY('q'):
             exit(0);
         case 'h':
             C.mode = PREPARE_HOST;
@@ -45,7 +49,7 @@ void process_keypress_undefined_mode(int key) {
 
 void process_keypress_prepare_host_mode(int key) {
     switch (key) {
-        case 'q':
+        case CTRL_KEY('q'):
             C.mode = UNDEFINED;
             break;
         case '\r':
@@ -59,7 +63,7 @@ void process_keypress_prepare_host_mode(int key) {
 
 void process_keypress_prepare_connect_mode(int key) {
     switch (key) {
-        case 'q':
+        case CTRL_KEY('q'):
             C.mode = UNDEFINED;
             break;
         case '\r':
@@ -71,21 +75,38 @@ void process_keypress_prepare_connect_mode(int key) {
     }
 }
 
+void process_message_typing(int key) {
+    int current_message_len = strlen(C.current_message);
+
+    if (key == 127)
+        C.current_message[current_message_len - 1] = '\0';
+    else if (current_message_len >= 1023) return;
+    else {
+        C.current_message[current_message_len] = key;
+        C.current_message[current_message_len + 1] = '\0';
+    }
+}
+
 void process_keypress_host_mode(int key) {
-    switch (key) {
-        case 'q':
-            pthread_cancel(C.accept_thread);
-            pthread_join(C.accept_thread, NULL);
-            C.mode = UNDEFINED;
-            break;
-        default:
-            break;
+    log_print("key=%d\n", key);
+    if (32 <= key && key <= 127) {
+        process_message_typing(key);
+    } else {
+        switch (key) {
+            case CTRL_KEY('q'):
+                pthread_cancel(C.accept_thread);
+                pthread_join(C.accept_thread, NULL);
+                C.mode = UNDEFINED;
+                break;
+            default:
+                break;
+        }
     }
 }
 
 void process_keypress_connect_mode(int key) {
     switch (key) {
-        case 'q':
+        case CTRL_KEY('q'):
             pthread_cancel(C.connect_thread);
             pthread_join(C.connect_thread, NULL);
             C.mode = UNDEFINED;

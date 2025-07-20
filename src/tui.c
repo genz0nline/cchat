@@ -36,7 +36,7 @@ void draw_mode_menu(abuf *ab) {
 
     char *host_chat = "Host a new chat room - h";
     char *connect_to_chat = "Connect to existing chat room - c";
-    char *leave_chat = "Exit - q";
+    char *leave_chat = "Exit - Ctrl-q";
 
     for (int i = 0; i < C.rows; i++) {
         if (i == host_idx) {
@@ -71,8 +71,13 @@ int get_participants_width() {
     return width;
 }
 
-void draw_messages(abuf *mbuf) {
+void draw_messages(char **mbuf) {
     int width = C.cols - get_participants_width();
+
+    for (int i = 0; i < C.rows - 1; i++) {
+        mbuf[i] = malloc(width);
+        mbuf[i][0] = '\0';
+    }
 }
 
 int get_participants_count() {
@@ -122,17 +127,28 @@ void draw_chatroom_ui(abuf *ab) {
         draw_centered(ab, mode, strlen(mode));
     } else if (C.mode == HOST) {
         char **pbuf = (char **)malloc(sizeof(char *) * C.rows);
+        char **mbuf = (char **)malloc(sizeof(char *) * (C.rows - 1));
 
         int p_width = get_participants_width();
 
         draw_participants(pbuf);
+        draw_messages(mbuf);
 
         for (int i = 0; i < C.rows; i++) {
             ab_append(ab, pbuf[i], p_width);
-            ab_append(ab, "\r\n", 2);
+            if (i == C.rows - 1) {
+                ab_append(ab, C.current_message, strlen(C.current_message));
+            } else {
+                ab_append(ab, mbuf[i], strlen(mbuf[i]));
+                free(mbuf[i]);
+            }
+            if (i < C.rows - 1)
+                ab_append(ab, "\r\n", 2);
             free(pbuf[i]);
+
         }
         free(pbuf);
+        free(mbuf);
     }
 }
 

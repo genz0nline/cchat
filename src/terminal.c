@@ -52,7 +52,7 @@ void update_screen_size() {
         die("ioctl");
     }
     C.cols = ws.ws_col;
-    C.rows = ws.ws_row - 1;
+    C.rows = ws.ws_row;
 }
 
 void clean_screen() {

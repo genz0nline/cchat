@@ -13,10 +13,15 @@ void chat_init() {
     C.mode = UNDEFINED;
     C.clients = NULL;
     char *message = "lorem ipsum";
-    memcpy(C.message, message, strlen(message) + 1);
+    memcpy(C.current_message, message, strlen(message) + 1);
+    C.message[0] = '\0';
     C.username[0] = '\0';
     C.clients_len = 0;
     C.clients_size = 0;
+
+    C.messages = NULL;
+    C.messages_len = 0;
+    C.messages_size = 0;
 }
 
 int main(int argc, char *argv[]) {

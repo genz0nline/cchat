@@ -52,6 +52,7 @@ void cancel_clients(void *p) {
     log_print("canceling clients_threads\n");
 
     pthread_mutex_lock(&C.clients_mutex);
+    log_print("clients mutex acquired in cancel_clients()\n");
 
     for (int i = 0; i < C.clients_len; i++) {
         if (!C.clients[i]->disconnected) {
@@ -62,11 +63,37 @@ void cancel_clients(void *p) {
     }
 
     pthread_mutex_unlock(&C.clients_mutex);
+    log_print("clients mutex freed in cancel_clients()\n");
+}
+
+void cancel_connection(void *p) {
+    pthread_cancel(C.connect_thread);
+    pthread_join(C.connect_thread, NULL);
 }
 
 void free_clients(void *p) {
     if (C.clients)
         free(C.clients);
+}
+
+void add_client(int fd) {
+    Client *new_client = (Client *)malloc(sizeof(Client));
+    new_client->socket = fd;
+    new_client->disconnected = 0;
+
+    pthread_mutex_lock(&C.clients_mutex);
+    log_print("clients mutex acquired in add_client()\n");
+    if (C.clients_len >= C.clients_size) {
+        C.clients_size = C.clients_size * 2 + 1;
+        C.clients = (Client **)realloc(C.clients, (sizeof(Client *) * C.clients_size));
+    }
+
+    C.clients[C.clients_len] = new_client;
+    C.clients_len++;
+    pthread_mutex_unlock(&C.clients_mutex);
+    log_print("clients mutex freed in add_client()\n");
+
+    pthread_create(&new_client->thread, NULL, handle_client_connection, (void *)new_client);
 }
 
 void *host_chat(void *p) {
@@ -92,32 +119,26 @@ void *host_chat(void *p) {
 
     pthread_cleanup_push(cancel_clients, NULL);
 
+    // Connecting host as a client
+    int pair[2];
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, pair)) die("socketpair");
+    pthread_create(&C.connect_thread, NULL, connect_to_chat, (void *)pair);
+    add_client(pair[1]);
+    log_print("Accepted loopback connection\n");
+    pthread_cleanup_push(cancel_connection, NULL);
+
     while (1) {
+        log_print("In loop\n");
         struct sockaddr_in new_connection;
         socklen_t size = sizeof(new_connection);
         int new_client_fd;
         if ((new_client_fd = accept(C.server_socket, (struct sockaddr *)&new_connection, &size)) == -1) die("accept");
 
         log_print("Accepted connection from %s\n", inet_ntoa(new_connection.sin_addr));
-
-        Client *new_client = (Client *)malloc(sizeof(Client));
-        new_client->socket = new_client_fd;
-        new_client->disconnected = 0;
-
-        pthread_mutex_lock(&C.clients_mutex);
-        if (C.clients_len >= C.clients_size) {
-            C.clients_size = C.clients_size * 2 + 1;
-            C.clients = (Client **)realloc(C.clients, (sizeof(Client *) * C.clients_size));
-        }
-
-        C.clients[C.clients_len] = new_client;
-        C.clients_len++;
-        pthread_mutex_unlock(&C.clients_mutex);
-
-        pthread_create(&new_client->thread, NULL, handle_client_connection, (void *)new_client);
-
+        add_client(new_client_fd);
     }
 
+    pthread_cleanup_pop(1);
     pthread_cleanup_pop(1);
     pthread_cleanup_pop(1);
     pthread_cleanup_pop(1);
@@ -127,19 +148,29 @@ void *host_chat(void *p) {
 
 void *connect_to_chat(void *p) {
 
-    C.connect_socket = socket(AF_INET, SOCK_STREAM, 0);
-    if (C.connect_socket == -1) die("socket");
+    int loopback;
+
+    if (p) {
+        loopback = 1;
+        C.connect_socket = *(int *)p;
+    } else {
+        loopback = 0;
+        C.connect_socket = socket(AF_INET, SOCK_STREAM, 0);
+        if (C.connect_socket == -1) die("socket");
+    }
 
     pthread_cleanup_push(close_socket, (void *)&C.connect_socket);
 
     log_print("Created connect socket %d\n", C.connect_socket);
 
-    struct sockaddr_in addr;
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(PORT);
-    inet_aton("127.0.0.1", &addr.sin_addr);
+    if (!loopback) {
+        struct sockaddr_in addr;
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(PORT);
+        inet_aton("127.0.0.1", &addr.sin_addr);
 
-    if (connect(C.connect_socket, (struct sockaddr *)&addr, sizeof(addr)) == -1) die("connect");
+        if (connect(C.connect_socket, (struct sockaddr *)&addr, sizeof(addr)) == -1) die("connect");
+    }
 
     while (1) {
         // if (strlen(C.message) > 0) {
