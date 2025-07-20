@@ -1,7 +1,10 @@
+#include <pthread.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include "abuf.h"
 #include "state.h"
+#include "log.h"
 #include "tui.h"
 
 extern struct chat_cfg C;
@@ -58,11 +61,79 @@ void draw_prepare_connect_menu(abuf *ab) {
     draw_centered(ab, ui, strlen(ui));
 }
 
+#define MAX_PARTICIPANTS_BUFFER_WIDTH   40
+
+int get_participants_width() {
+    int width = C.cols / 4;
+
+    if (width > MAX_PARTICIPANTS_BUFFER_WIDTH) return MAX_PARTICIPANTS_BUFFER_WIDTH;
+
+    return width;
+}
+
+void draw_messages(abuf *mbuf) {
+    int width = C.cols - get_participants_width();
+}
+
+int get_participants_count() {
+    int count = 0;
+
+    for (int i = 0; i < C.clients_len; i++) {
+        count += C.clients[i]->disconnected == 0;
+    }
+
+    return count;
+}
+
+void draw_participants(char **pbuf) {
+    int width = C.cols / 4;
+    if (width > MAX_PARTICIPANTS_BUFFER_WIDTH) width = MAX_PARTICIPANTS_BUFFER_WIDTH;
+
+    int n;
+
+    pthread_mutex_lock(&C.clients_mutex);
+    int current_participant = 0;
+    for (int i = 0; i < C.rows; i++) {
+        pbuf[i] = (char *)malloc(width);
+
+        int participants_count = get_participants_count();
+
+        if (i == C.rows - 1) {
+            n = snprintf(pbuf[i], 32, "%d %s", participants_count, participants_count == 1 ? "participant" : "participants" );
+        } else if (i < participants_count) {
+            while (C.clients[current_participant]->disconnected) current_participant++;
+            n = snprintf(pbuf[i], 32, "%d", C.clients[current_participant]->socket);
+            current_participant++;
+        } else {
+            n = 0;
+        }
+
+        for (int j = n; j < width; j++)
+            pbuf[i][j] = ' ';
+    }
+    pthread_mutex_unlock(&C.clients_mutex);
+}
+
 void draw_chatroom_ui(abuf *ab) {
-    char *ui = "chatroom ui";
-    char *mode = C.mode == CONNECT ? "connect" : "host";
-    draw_centered(ab, ui, strlen(ui));
-    draw_centered(ab, mode, strlen(mode));
+    if (C.mode == CONNECT) {
+        char *ui = "chatroom ui";
+        char *mode = C.mode == CONNECT ? "connect" : "host";
+        draw_centered(ab, ui, strlen(ui));
+        draw_centered(ab, mode, strlen(mode));
+    } else if (C.mode == HOST) {
+        char **pbuf = (char **)malloc(sizeof(char *) * C.rows);
+
+        int p_width = get_participants_width();
+
+        draw_participants(pbuf);
+
+        for (int i = 0; i < C.rows; i++) {
+            ab_append(ab, pbuf[i], p_width);
+            ab_append(ab, "\r\n", 2);
+            free(pbuf[i]);
+        }
+        free(pbuf);
+    }
 }
 
 void draw_interface(abuf *ab) {

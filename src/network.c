@@ -37,7 +37,6 @@ void *handle_client_connection(void *p) {
     }
 
     return NULL;
-
 }
 
 #define PORT        8000
@@ -55,10 +54,19 @@ void cancel_clients(void *p) {
     pthread_mutex_lock(&C.clients_mutex);
 
     for (int i = 0; i < C.clients_len; i++) {
-        pthread_cancel(C.clients[i]->thread);
+        if (!C.clients[i]->disconnected) {
+            pthread_cancel(C.clients[i]->thread);
+            pthread_join(C.clients[i]->thread, NULL);
+            free(C.clients[i]);
+        }
     }
 
     pthread_mutex_unlock(&C.clients_mutex);
+}
+
+void free_clients(void *p) {
+    if (C.clients)
+        free(C.clients);
 }
 
 void *host_chat(void *p) {
@@ -66,6 +74,7 @@ void *host_chat(void *p) {
     C.server_socket = socket(AF_INET, SOCK_STREAM, 0);
     if (C.server_socket == -1) die("socket");
     pthread_cleanup_push(close_socket, (void *)&C.server_socket);
+    pthread_cleanup_push(free_clients, NULL);
 
     log_print("Created accept socket %d\n", C.server_socket);
 
@@ -111,10 +120,10 @@ void *host_chat(void *p) {
 
     pthread_cleanup_pop(1);
     pthread_cleanup_pop(1);
+    pthread_cleanup_pop(1);
 
     return NULL;
 }
-
 
 void *connect_to_chat(void *p) {
 
@@ -133,10 +142,11 @@ void *connect_to_chat(void *p) {
     if (connect(C.connect_socket, (struct sockaddr *)&addr, sizeof(addr)) == -1) die("connect");
 
     while (1) {
-        if (strlen(C.message) > 0) {
-            if (write(C.connect_socket, C.message, 1024) <= 0) break;
-            sleep(1);
-        }
+        // if (strlen(C.message) > 0) {
+        //     if (write(C.connect_socket, C.message, 1024) <= 0) break;
+        //     sleep(1);
+        // }
+        pthread_testcancel();
     }
 
     pthread_cleanup_pop(1);
