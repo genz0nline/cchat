@@ -12,6 +12,7 @@ typedef enum {
 } chat_mode;
 
 typedef struct Client {
+    int id;
     char *nickname;
     pthread_t thread;
     int disconnected;
@@ -30,6 +31,7 @@ struct chat_cfg {
 
     char username[32];
     char current_message[1024];
+    pthread_mutex_t message_mutex;
     char message[1024];
 
     /*** For server mode ***/
@@ -37,6 +39,7 @@ struct chat_cfg {
     int server_socket;
 
     pthread_mutex_t clients_mutex;
+    int id_seq;
     Client **clients;
     size_t clients_len;
     size_t clients_size;
@@ -46,6 +49,7 @@ struct chat_cfg {
     int connect_socket;
 
     /*** Messages ***/
+    pthread_mutex_t messages_mutex;
     ChatMessage *messages;
     size_t messages_len;
     size_t messages_size;

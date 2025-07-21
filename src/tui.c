@@ -74,10 +74,16 @@ int get_participants_width() {
 void draw_messages(char **mbuf) {
     int width = C.cols - get_participants_width();
 
+    pthread_mutex_lock(&C.messages_mutex);
     for (int i = 0; i < C.rows - 1; i++) {
         mbuf[i] = malloc(width);
-        mbuf[i][0] = '\0';
+        if (i < C.messages_len) {
+            snprintf(mbuf[i], width, "%s: %s", C.messages[i].sender_nickname, C.messages[i].content);
+        } else {
+            mbuf[i][0] = '\0';
+        }
     }
+    pthread_mutex_unlock(&C.messages_mutex);
 }
 
 int get_participants_count() {
@@ -105,9 +111,11 @@ void draw_participants(char **pbuf) {
 
         if (i == C.rows - 1) {
             n = snprintf(pbuf[i], 32, "%d %s", participants_count, participants_count == 1 ? "participant" : "participants" );
+        } else if (i == C.rows - 2) {
+            n = snprintf(pbuf[i], 32, "%d %s", (int) C.messages_len, C.messages_len == 1 ? "message" : "messages" );
         } else if (i < participants_count) {
             while (C.clients[current_participant]->disconnected) current_participant++;
-            n = snprintf(pbuf[i], 32, "%d", C.clients[current_participant]->socket);
+            n = snprintf(pbuf[i], 32, "%d", C.clients[current_participant]->id);
             current_participant++;
         } else {
             n = 0;

@@ -78,18 +78,23 @@ void process_keypress_prepare_connect_mode(int key) {
 void process_message_typing(int key) {
     int current_message_len = strlen(C.current_message);
 
-    if (key == 127)
+    if (key == '\r') {
+        if (current_message_len > 0) {
+            memcpy(C.message, C.current_message, current_message_len + 1);
+            C.current_message[0] = '\0';
+        }
+    } else if (key == 127) {
         C.current_message[current_message_len - 1] = '\0';
-    else if (current_message_len >= 1023) return;
-    else {
+    } else if (current_message_len >= 1023) {
+        return;
+    } else {
         C.current_message[current_message_len] = key;
         C.current_message[current_message_len + 1] = '\0';
     }
 }
 
 void process_keypress_host_mode(int key) {
-    log_print("key=%d\n", key);
-    if (32 <= key && key <= 127) {
+    if (key == '\r' || (32 <= key && key <= 127)) {
         process_message_typing(key);
     } else {
         switch (key) {

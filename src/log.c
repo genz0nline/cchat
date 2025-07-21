@@ -154,6 +154,7 @@ int log_init(int dev) {
 
 void log_cleanup() {
     if (log_file_path) free(log_file_path);
+    pthread_mutex_destroy(&log_mutex);
 }
 
 void log_print(char *fmt, ...) {

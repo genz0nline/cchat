@@ -1,6 +1,7 @@
 #include "input.h"
 #include "log.h"
 #include "terminal.h"
+#include <pthread.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,14 +19,15 @@ void chat_init() {
     C.username[0] = '\0';
     C.clients_len = 0;
     C.clients_size = 0;
+    C.id_seq = 1;
 
     C.messages = NULL;
     C.messages_len = 0;
     C.messages_size = 0;
+    pthread_mutex_init(&C.message_mutex, NULL);
 }
 
 int main(int argc, char *argv[]) {
-
     int dev = 0;
 
     if (argc >= 2 && *argv[1] == 'd') {
