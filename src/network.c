@@ -1,6 +1,9 @@
 #include <pthread.h>
+#include <assert.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -10,10 +13,30 @@
 
 #include "network.h"
 #include "log.h"
+#include "proto.h"
 #include "state.h"
 #include "err.h"
 
 extern struct chat_cfg C;
+
+void broadcast_message(message_t type, void *p) {
+    size_t message_len;
+    char *message = form_message(type, p, &message_len);
+    for (int i = 0; i < C.clients_len; i++) {
+        Client *client = C.clients[i];
+        if (!client->disconnected)
+            write(client->socket, message, message_len);
+    }
+}
+
+void send_message(message_t type, Client* to, void *p) {
+    size_t message_len;
+    char *message = form_message(type, p, &message_len);
+
+    if (!to->disconnected) {
+        write(to->socket, message, message_len);
+    }
+}
 
 void add_message(char *c, int client) {
     pthread_mutex_lock(&C.messages_mutex);
@@ -42,11 +65,12 @@ void *handle_client_connection(void *p) {
     int n;
 
     while ((n = read(client->socket, message, 1024)) > 0) {
-        add_message(message, client->socket);
+        add_message(message, client->id);
     }
 
     if (n == 0) {
         client->disconnected = 1;
+        broadcast_message(STOC_CLIDIS, client);
         close(client->socket);
         pthread_exit(NULL);
     }
@@ -68,7 +92,7 @@ void close_socket(void *p) {
 
 void cancel_clients(void *p) {
     log_print("Canceling clients_threads\n");
-    
+
     pthread_mutex_lock(&C.clients_mutex);
     for (int i = 0; i < C.clients_len; i++) {
         if (!C.clients[i]->disconnected) {
@@ -90,11 +114,12 @@ void free_clients(void *p) {
         free(C.clients);
 }
 
-void add_client(int fd) {
+int add_client(int fd) {
     Client *new_client = (Client *)malloc(sizeof(Client));
     new_client->socket = fd;
     new_client->disconnected = 0;
     new_client->id = C.id_seq++;
+    sprintf(new_client->nickname, "__new_client_%d", new_client->id);
 
     pthread_mutex_lock(&C.clients_mutex);
     if (C.clients_len >= C.clients_size) {
@@ -102,11 +127,19 @@ void add_client(int fd) {
         C.clients = (Client **)realloc(C.clients, (sizeof(Client *) * C.clients_size));
     }
 
+    broadcast_message(STOC_CLICON, new_client);
+
     C.clients[C.clients_len] = new_client;
     C.clients_len++;
+
+    send_message(STOC_CLILST, new_client, NULL);
+
     pthread_mutex_unlock(&C.clients_mutex);
 
     pthread_create(&new_client->thread, NULL, handle_client_connection, (void *)new_client);
+
+    log_print("Added client %d\n", fd);
+    return new_client->id;
 }
 
 void *host_chat(void *p) {
@@ -139,7 +172,7 @@ void *host_chat(void *p) {
     int pair[2];
     if (socketpair(AF_UNIX, SOCK_STREAM, 0, pair)) die("socketpair");
     pthread_create(&C.connect_thread, NULL, connect_to_chat, (void *)pair);
-    add_client(pair[1]);
+    int id = add_client(pair[1]);
     log_print("Accepted loopback connection\n");
     pthread_cleanup_push(cancel_connection, NULL);
 
@@ -189,13 +222,39 @@ void *connect_to_chat(void *p) {
         if (connect(C.connect_socket, (struct sockaddr *)&addr, sizeof(addr)) == -1) die("connect");
     }
 
+    // while (1) {
+    //     if (strlen(C.message) > 0) {
+    //         if (write(C.connect_socket, C.message, 1024) <= 0) {
+    //             break;
+    //         }
+    //         C.message[0] = '\0';
+    //     }
+    //     pthread_testcancel();
+    // }
+
     while (1) {
-        if (strlen(C.message) > 0) {
-            if (write(C.connect_socket, C.message, 1024) <= 0) {
-                break;
+
+        char metadata[4];
+        uint16_t content_length;
+
+
+        if (read(C.connect_socket, metadata, MD_LEN)) {
+            log_print("Read metadata\n");
+            uint8_t protocol_version = metadata[0];
+            assert(protocol_version == 1); // TODO: It has to be something else
+
+            message_t type = metadata[1];
+
+            memcpy(&content_length, metadata + PV_LEN + MT_LEN, CL_LEN);
+            content_length = ntohs(content_length);
+            char *content = malloc(content_length);
+
+            if (read(C.connect_socket, content, content_length) == content_length) {
+                log_print("Read message of type %d\n", type);
+                process_message(type, content, content_length);
             }
-            C.message[0] = '\0';
         }
+
         pthread_testcancel();
     }
 

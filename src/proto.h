@@ -1,38 +1,57 @@
 #ifndef PROTO_h_
 #define PROTO_h_
 
-#define PROTO_V             1
+#include <stddef.h>
+#include <stdint.h>
 
-typedef enum {
+#define PROTO_VER          1
 
-    /*** server to client: list of other clients ***/
-    STOC_CLILST,
+/*** -------- Protocol description -------- ***/
 
-    /*** server to client: another client connected ***/
-    STOC_CLICON,
+    /*** -------- Message types -------- ***/
 
-    /*** server to client: another client disconnected ***/
-    STOC_CLIDIS,
+typedef uint8_t message_t;
 
-    /*** server to client: message ***/
-    STOC_MSG,
+/*** server to client: list of other clients ***/
+#define STOC_CLILST         0x01
 
-    /*** client to server: message ***/
-    CTOS_MSG,
+/*** server to client: another client connected ***/
+#define STOC_CLICON         0x02
 
-    /*** client to server: change nickname ***/
-    CTOS_CNN,
+/*** server to client: another client disconnected ***/
+#define STOC_CLIDIS         0x03
 
-    /*** server to client: change nickname status ***/
-    STOC_CNNSTAT,
+/*** server to client: message ***/
+#define STOC_MSG            0x04
 
-    /*** server to client: another client changed nickname ***/
-    STOC_CNN,
-} message_t;
+/*** client to server: message ***/
+#define CTOS_MSG            0x05
+
+/*** client to server: change nickname ***/
+#define CTOS_CNN            0x06
+
+/*** server to client: change nickname status ***/
+#define STOC_CNNSTAT        0x07
+
+/*** server to client: another client changed nickname ***/
+#define STOC_CNN            0x08
+
+    /*** -------- Packaging -------- ***/
+
+#define PV_LEN              1
+#define MT_LEN              1
+#define CL_LEN              2
+#define MD_LEN              PV_LEN + MT_LEN + CL_LEN
+
+#define NN_LEN              32
+#define ID_LEN              2
+#define STAT_LEN            1
 
 /*** 
- * |  metadata  |        the content         |
- * | <-1 byte-> | <- content-length bytes -> |
+ * |                      metadata                    |                            |
+ * | protocol version | message type | content length |          content           |
+ * | <--- 1 byte ---> | <- 1 byte -> | <- 2 bytes  -> |                            |
+ * | <------------------ 4 bytes -------------------> | <- content-length bytes -> |
  *
  * metadata includes:
  *  - message type (1 byte)
@@ -42,19 +61,19 @@ typedef enum {
  *
  * ------ STOC_CLILST ------
  *  ... ], [
- *  client_id       4 bytes
+ *  client_id       2 bytes
  *  nickname        32 bytes
  *  ], [ ...
  * 
  * ------ STOC_CLICON ------
- *  client_id       4 bytes
+ *  client_id       2 bytes
  *  nickname        32 bytes
  * 
  * ------ STOC_CLIDIS ------
- *  client_id       4 bytes
+ *  client_id       2 bytes
  *
  * ------  STOC_MSG  ------
- *  client_id       4 bytes
+ *  client_id       2 bytes
  *  message         <var>
  *
  * ------  CTOS_MSG  ------
@@ -71,5 +90,10 @@ typedef enum {
  *  nickname        32 bytes
  *
  * ***/
+
+/*** declarations ***/
+
+char *form_message(message_t type, void *p, size_t *message_len);
+void process_message(message_t type, char *content, uint16_t content_length);
 
 #endif // PROTO_h_

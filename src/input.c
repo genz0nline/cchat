@@ -110,14 +110,18 @@ void process_keypress_host_mode(int key) {
 }
 
 void process_keypress_connect_mode(int key) {
-    switch (key) {
-        case CTRL_KEY('q'):
-            pthread_cancel(C.connect_thread);
-            pthread_join(C.connect_thread, NULL);
-            C.mode = UNDEFINED;
-            break;
-        default:
-            break;
+    if (key == '\r' || (32 <= key && key <= 127)) {
+        process_message_typing(key);
+    } else {
+        switch (key) {
+            case CTRL_KEY('q'):
+                pthread_cancel(C.connect_thread);
+                pthread_join(C.connect_thread, NULL);
+                C.mode = UNDEFINED;
+                break;
+            default:
+                break;
+        }
     }
 }
 

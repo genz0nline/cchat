@@ -12,11 +12,12 @@ struct chat_cfg C;
 
 void chat_init() {
     C.mode = UNDEFINED;
-    C.clients = NULL;
-    char *message = "lorem ipsum";
-    memcpy(C.current_message, message, strlen(message) + 1);
+
+    C.current_message[0] = '\0';
     C.message[0] = '\0';
     C.username[0] = '\0';
+
+    C.clients = NULL;
     C.clients_len = 0;
     C.clients_size = 0;
     C.id_seq = 1;
@@ -25,6 +26,11 @@ void chat_init() {
     C.messages_len = 0;
     C.messages_size = 0;
     pthread_mutex_init(&C.message_mutex, NULL);
+
+    C.participants = NULL;
+    C.participants_len = 0;
+    C.participants_size = 0;
+    pthread_mutex_init(&C.participants_mutex, NULL);
 }
 
 int main(int argc, char *argv[]) {
