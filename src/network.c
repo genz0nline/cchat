@@ -16,45 +16,31 @@
 #include "proto.h"
 #include "state.h"
 #include "err.h"
+#include "utils.h"
 
 extern struct chat_cfg C;
 
-void broadcast_message(message_t type, void *p) {
-    size_t message_len;
-    char *message = form_message(type, p, &message_len);
-    for (int i = 0; i < C.clients_len; i++) {
-        Client *client = C.clients[i];
-        if (!client->disconnected)
-            write(client->socket, message, message_len);
+int process_protocol_message(int socket, Client *client) {
+    char metadata[4];
+    uint16_t content_length;
+
+    int n;
+
+    if ((n = read_nbytes(socket, metadata, MD_LEN)) == MD_LEN) {
+        uint8_t protocol_version = metadata[0];
+        if (protocol_version != 0x01) exit(123);
+
+        message_t type = metadata[1];
+
+        memcpy(&content_length, metadata + PV_LEN + MT_LEN, CL_LEN);
+        content_length = ntohs(content_length);
+        char *content = malloc(content_length);
+        
+        if ((n = read_nbytes(socket, content, content_length)) == content_length) {
+            process_message(type, content, content_length, client);
+        }
     }
-}
-
-void send_message(message_t type, Client* to, void *p) {
-    size_t message_len;
-    char *message = form_message(type, p, &message_len);
-
-    if (!to->disconnected) {
-        write(to->socket, message, message_len);
-    }
-}
-
-void add_message(char *c, int client) {
-    pthread_mutex_lock(&C.messages_mutex);
-    if (C.messages_len >= C.messages_size) {
-        C.messages_size = 2 * C.messages_size + 1;
-        C.messages = (ChatMessage *)realloc(C.messages, sizeof(ChatMessage) * C.messages_size);
-    }
-
-    ChatMessage new_message;
-
-    new_message.sender_nickname = malloc(16);
-    new_message.content = malloc(1024);
-
-    memcpy(new_message.content, c, strlen(c));
-    sprintf(new_message.sender_nickname, "%d", client);
-
-    C.messages[C.messages_len++] = new_message;
-    pthread_mutex_unlock(&C.messages_mutex);
+    return n;
 }
 
 void *handle_client_connection(void *p) {
@@ -64,13 +50,11 @@ void *handle_client_connection(void *p) {
     char message[1024];
     int n;
 
-    while ((n = read(client->socket, message, 1024)) > 0) {
-        add_message(message, client->id);
-    }
+    while ((n = process_protocol_message(client->socket, client)) > 0);
 
     if (n == 0) {
         client->disconnected = 1;
-        broadcast_message(STOC_CLIDIS, client);
+        server_broadcast_message(STOC_CLIDIS, client, NULL);
         close(client->socket);
         pthread_exit(NULL);
     }
@@ -127,12 +111,12 @@ int add_client(int fd) {
         C.clients = (Client **)realloc(C.clients, (sizeof(Client *) * C.clients_size));
     }
 
-    broadcast_message(STOC_CLICON, new_client);
+    server_broadcast_message(STOC_CLICON, new_client, NULL);
 
     C.clients[C.clients_len] = new_client;
     C.clients_len++;
 
-    send_message(STOC_CLILST, new_client, NULL);
+    server_send_message(STOC_CLILST, new_client, NULL);
 
     pthread_mutex_unlock(&C.clients_mutex);
 
@@ -196,6 +180,32 @@ void *host_chat(void *p) {
     return NULL;
 }
 
+int client_send_message(message_t type, char *content) {
+    size_t message_len;
+    char *message = form_message(type, NULL, content, &message_len);
+
+    int n = write(C.connect_socket, message, message_len);
+    if (n != message_len) return 1;
+    return 0;
+}
+
+void *handle_sending_messages(void *p) {
+    while (1) {
+        pthread_mutex_lock(&C.message_mutex);
+        if (strlen(C.message) > 0) {
+            if (client_send_message(CTOS_MSG, C.message)) break;
+        }
+        C.message[0] = '\0';
+        pthread_mutex_unlock(&C.message_mutex);
+        pthread_testcancel();
+    }
+    return NULL;
+}
+
+void cancel_client_write_thread(void *p) {
+    pthread_cancel(*(pthread_t *)p);
+}
+
 void *connect_to_chat(void *p) {
 
     int loopback;
@@ -222,43 +232,18 @@ void *connect_to_chat(void *p) {
         if (connect(C.connect_socket, (struct sockaddr *)&addr, sizeof(addr)) == -1) die("connect");
     }
 
-    // while (1) {
-    //     if (strlen(C.message) > 0) {
-    //         if (write(C.connect_socket, C.message, 1024) <= 0) {
-    //             break;
-    //         }
-    //         C.message[0] = '\0';
-    //     }
-    //     pthread_testcancel();
-    // }
+    pthread_t write_thread;
+    pthread_create(&write_thread, NULL, handle_sending_messages, NULL);
+    pthread_cleanup_push(cancel_client_write_thread, (void *)&write_thread);
 
     while (1) {
-
-        char metadata[4];
-        uint16_t content_length;
-
-
-        if (read(C.connect_socket, metadata, MD_LEN)) {
-            log_print("Read metadata\n");
-            uint8_t protocol_version = metadata[0];
-            assert(protocol_version == 1); // TODO: It has to be something else
-
-            message_t type = metadata[1];
-
-            memcpy(&content_length, metadata + PV_LEN + MT_LEN, CL_LEN);
-            content_length = ntohs(content_length);
-            char *content = malloc(content_length);
-
-            if (read(C.connect_socket, content, content_length) == content_length) {
-                log_print("Read message of type %d\n", type);
-                process_message(type, content, content_length);
-            }
-        }
-
+        process_protocol_message(C.connect_socket, NULL);
         pthread_testcancel();
     }
 
     pthread_cleanup_pop(1);
+    pthread_cleanup_pop(1);
     C.mode = UNDEFINED;
     pthread_exit(NULL);
 }
+

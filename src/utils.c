@@ -1,5 +1,8 @@
 #include "utils.h"
 #include "state.h"
+#include <errno.h>
+#include <stdio.h>
+#include <unistd.h>
 
 extern struct chat_cfg C;
 
@@ -23,4 +26,22 @@ int get_participants_count() {
     }
 
     return count;
+}
+
+ssize_t read_nbytes(int fd, void *buf, size_t nbytes) {
+    size_t total_read = 0;
+    char *ptr = (char *)buf;
+    while (total_read < nbytes) {
+        ssize_t n = read(fd, ptr + total_read, nbytes - total_read);
+        if (n < 0) {
+            if (errno == EINTR)
+                continue;
+            return -1;
+        }
+        if (n == 0) {
+            break;
+        }
+        total_read += n;
+    }
+    return total_read;
 }

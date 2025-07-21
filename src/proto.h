@@ -93,7 +93,11 @@ typedef uint8_t message_t;
 
 /*** declarations ***/
 
-char *form_message(message_t type, void *p, size_t *message_len);
-void process_message(message_t type, char *content, uint16_t content_length);
+typedef struct Client Client;
+
+char *form_message(message_t type, Client *client, char *content, size_t *message_len);
+void process_message(message_t type, char *content, uint16_t content_length, Client *client);
+void server_broadcast_message(message_t type, Client *client, char *content);
+void server_send_message(message_t type, Client* client, char *content);
 
 #endif // PROTO_h_

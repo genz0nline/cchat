@@ -80,8 +80,10 @@ void process_message_typing(int key) {
 
     if (key == '\r') {
         if (current_message_len > 0) {
+            pthread_mutex_lock(&C.message_mutex);
             memcpy(C.message, C.current_message, current_message_len + 1);
             C.current_message[0] = '\0';
+            pthread_mutex_unlock(&C.message_mutex);
         }
     } else if (key == 127) {
         C.current_message[current_message_len - 1] = '\0';
