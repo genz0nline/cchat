@@ -15,7 +15,10 @@ void chat_init() {
 
     C.current_message[0] = '\0';
     C.message[0] = '\0';
-    C.username[0] = '\0';
+    C.nickname_set = 0;
+    C.nickname[0] = '\0';
+    C.nickname_field[0] = '\0';
+    pthread_mutex_init(&C.nickname_mutex, NULL);
 
     C.clients = NULL;
     C.clients_len = 0;

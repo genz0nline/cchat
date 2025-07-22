@@ -31,10 +31,13 @@ typedef uint8_t message_t;
 #define CTOS_CNN            0x06
 
 /*** server to client: change nickname status ***/
-#define STOC_CNNSTAT        0x07
+#define STOC_STAT           0x07
 
 /*** server to client: another client changed nickname ***/
 #define STOC_CNN            0x08
+
+/*** client to server: introduction with a nickname ***/
+#define CTOS_INTRO          0x09
 
     /*** -------- Packaging -------- ***/
 
@@ -45,7 +48,11 @@ typedef uint8_t message_t;
 
 #define NN_LEN              32
 #define ID_LEN              2
+
 #define STAT_LEN            1
+#define STAT_SUCCESS        0x00
+#define STAT_INVALID        0x01
+#define STAT_TAKEN          0x02
 
 /*** 
  * |                      metadata                    |                            |
@@ -82,11 +89,14 @@ typedef uint8_t message_t;
  * ------  CTOS_CNN  ------
  *  nickname        32 bytes
  * 
- * ----  STOC_CNN_STAT ----
+ * ------  STOC_STAT ------
  *  status          1 byte
  *
  * ------  CTOS_CNN  ------
  *  client_id       4 bytes
+ *  nickname        32 bytes
+ *
+ * ------ CTOS_INTRO ------
  *  nickname        32 bytes
  *
  * ***/
@@ -96,7 +106,7 @@ typedef uint8_t message_t;
 typedef struct Client Client;
 
 char *form_message(message_t type, Client *client, char *content, size_t *message_len);
-void process_message(message_t type, char *content, uint16_t content_length, Client *client);
+void process_message(message_t type, char *content, uint16_t content_length, Client *client, uint8_t *status);
 void server_broadcast_message(message_t type, Client *client, char *content);
 void server_send_message(message_t type, Client* client, char *content);
 

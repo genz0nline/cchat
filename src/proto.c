@@ -3,7 +3,6 @@
 #include "state.h"
 #include "utils.h"
 #include "log.h"
-#include <math.h>
 #include <netinet/in.h>
 #include <pthread.h>
 #include <stdint.h>
@@ -47,10 +46,12 @@ uint16_t get_content_length(message_t type, char *content) {
             return strlen(C.message) + 1;
         case CTOS_CNN: 
             return NN_LEN;
-        case STOC_CNNSTAT: 
+        case STOC_STAT: 
             return STAT_LEN;
         case STOC_CNN: 
             return ID_LEN + NN_LEN;
+        case CTOS_INTRO:
+            return NN_LEN;
         default:
             return 0;
     }
@@ -101,6 +102,24 @@ void set_client_to_server_message_content(char *buf, char *message) {
     memcpy(buf, message, strlen(message) + 1);
 }
 
+void set_client_to_server_change_nickname_content(char *buf, char *nickname) {
+    memcpy(buf, nickname, NN_LEN);
+}
+
+void set_status_content(char *buf, char *status) {
+    memcpy(buf, status, STAT_LEN);
+}
+
+void set_server_to_client_change_nickname_content(char *buf, Client *client, char *nickname) {
+    uint16_t id = htons(client->id);
+    memcpy(buf, &id, ID_LEN);
+    memcpy(buf + ID_LEN, nickname, NN_LEN);
+}
+
+void set_client_introduction_content(char *buf, char *nickname) {
+    memcpy(buf, nickname, NN_LEN);
+}
+
 void set_content(char *buf, message_t type, Client *client, char *content) {
     switch (type) {
         case STOC_CLILST: 
@@ -119,10 +138,16 @@ void set_content(char *buf, message_t type, Client *client, char *content) {
             set_client_to_server_message_content(buf, content);
             break;
         case CTOS_CNN: 
+            set_client_to_server_change_nickname_content(buf, content);
             break;
-        case STOC_CNNSTAT: 
+        case STOC_STAT: 
+            set_status_content(buf, content);
             break;
         case STOC_CNN: 
+            set_server_to_client_change_nickname_content(buf, client, content);
+            break;
+        case CTOS_INTRO:
+            set_client_introduction_content(buf, content);
             break;
     }
 }
@@ -168,7 +193,7 @@ void process_client_list_message(char *content, uint16_t content_length) {
     pthread_mutex_unlock(&C.participants_mutex);
 }
 
-void process_client_connected_message(char *content, uint16_t content_length) {
+void process_client_connected_message(char *content) {
     pthread_mutex_lock(&C.participants_mutex);
     if (C.participants_len >= C.participants_size) {
         C.participants_size = C.participants_size * 2 + 1;
@@ -184,7 +209,7 @@ void process_client_connected_message(char *content, uint16_t content_length) {
     pthread_mutex_unlock(&C.participants_mutex);
 }
 
-void process_client_disconnected_message(char *content, uint16_t content_length) {
+void process_client_disconnected_message(char *content) {
     pthread_mutex_lock(&C.participants_mutex);
     uint16_t id = ntohs(*(uint16_t *)(content));
     for (int i = 0; i < C.participants_len; i++) {
@@ -236,21 +261,67 @@ void process_server_to_client_message(char *content, uint16_t content_length) {
 
 void process_client_to_server_message(char *content, uint16_t content_length, Client *client) {
     pthread_mutex_lock(&C.clients_mutex);
-    log_print("Broadcasting message\n");
     server_broadcast_message(STOC_MSG, client, content);
     pthread_mutex_unlock(&C.clients_mutex);
 }
 
-void process_message(message_t type, char *content, uint16_t content_length, Client *client) {
+void process_client_to_server_change_nickname(char *content, Client *client) {
+    pthread_mutex_lock(&C.clients_mutex);
+
+    uint8_t status = validate_nickname(content);
+
+    server_send_message(STOC_STAT, client, (char *)&status);
+
+    if (status == STAT_SUCCESS) {
+        server_broadcast_message(STOC_CNN, client, content);
+    }
+
+    pthread_mutex_unlock(&C.clients_mutex);
+}
+
+void process_status_message(char *content, uint8_t *status) {
+    *status = *(uint8_t *)content;
+}
+
+void process_server_to_client_change_nickname(char *content) {
+    uint16_t client_id = ntohs(*(uint16_t *)(content));
+
+    pthread_mutex_lock(&C.participants_mutex);
+
+    for (int i = 0; i < C.participants_len; i++) {
+        Participant *participant = C.participants[i];
+
+        if (participant->id == client_id) {
+            memcpy(participant->nickname, content + ID_LEN, NN_LEN);
+        }
+    }
+
+    pthread_mutex_unlock(&C.participants_mutex);
+}
+
+void process_client_intro(char *content, Client *client, uint8_t *status) {
+    pthread_mutex_lock(&C.clients_mutex);
+
+    *status = validate_nickname(content);
+    server_send_message(STOC_STAT, client, (char *)status);
+
+    if (*status == STAT_SUCCESS) {
+        memcpy(client->nickname, content, NN_LEN);
+    }
+
+    pthread_mutex_unlock(&C.clients_mutex);
+}
+
+void process_message(message_t type, char *content, uint16_t content_length, Client *client, uint8_t *status) {
     switch (type) {
         case STOC_CLILST: 
             process_client_list_message(content, content_length);
             break;
         case STOC_CLICON: 
-            process_client_connected_message(content, content_length);
+            process_client_connected_message(content);
             break;
         case STOC_CLIDIS: 
-            process_client_disconnected_message(content, content_length);
+            process_client_disconnected_message(content);
             break;
         case STOC_MSG: 
             process_server_to_client_message(content, content_length);
@@ -259,10 +330,16 @@ void process_message(message_t type, char *content, uint16_t content_length, Cli
             process_client_to_server_message(content, content_length, client);
             break;
         case CTOS_CNN: 
+            process_client_to_server_change_nickname(content, client);
             break;
-        case STOC_CNNSTAT: 
+        case STOC_STAT: 
+            process_status_message(content, status);
             break;
         case STOC_CNN: 
+            process_server_to_client_change_nickname(content);
+            break;
+        case CTOS_INTRO:
+            process_client_intro(content, client, status);
             break;
     }
 }

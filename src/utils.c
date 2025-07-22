@@ -1,7 +1,12 @@
 #include "utils.h"
+#include "proto.h"
 #include "state.h"
+#include <ctype.h>
 #include <errno.h>
+#include "log.h"
+#include <pthread.h>
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 
 extern struct chat_cfg C;
@@ -44,4 +49,29 @@ ssize_t read_nbytes(int fd, void *buf, size_t nbytes) {
         total_read += n;
     }
     return total_read;
+}
+
+/*** Only use with clients lock acquired ***/
+int validate_nickname(char *nickname) {
+    char *p = nickname;
+
+    int status = STAT_SUCCESS;
+
+    while (*p != '\0' && p - nickname < NN_LEN) {
+        if (!isalnum(*p)) {
+            status = STAT_INVALID;
+            break;
+        }
+        p++;
+    }
+
+    for (int i = 0; i < C.clients_len; i++) {
+        Client *client = C.clients[i];
+        if (!client->disconnected && strncmp(client->nickname, nickname, NN_LEN) == 0) {
+            status = STAT_TAKEN;
+            break;
+        }
+    }
+
+    return status;
 }

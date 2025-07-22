@@ -20,7 +20,7 @@
 
 extern struct chat_cfg C;
 
-int process_protocol_message(int socket, Client *client) {
+int process_protocol_message(int socket, Client *client, uint8_t *status) {
     char metadata[4];
     uint16_t content_length;
 
@@ -37,7 +37,7 @@ int process_protocol_message(int socket, Client *client) {
         char *content = malloc(content_length);
         
         if ((n = read_nbytes(socket, content, content_length)) == content_length) {
-            process_message(type, content, content_length, client);
+            process_message(type, content, content_length, client, status);
         }
     }
     return n;
@@ -50,7 +50,7 @@ void *handle_client_connection(void *p) {
     char message[1024];
     int n;
 
-    while ((n = process_protocol_message(client->socket, client)) > 0);
+    while ((n = process_protocol_message(client->socket, client, NULL)) > 0);
 
     if (n == 0) {
         client->disconnected = 1;
@@ -98,12 +98,25 @@ void free_clients(void *p) {
         free(C.clients);
 }
 
+int negotiate_nickname(Client *client) {
+    uint8_t status;
+
+    process_protocol_message(client->socket, client, &status);
+
+    return status;
+}
+
 int add_client(int fd) {
     Client *new_client = (Client *)malloc(sizeof(Client));
     new_client->socket = fd;
     new_client->disconnected = 0;
     new_client->id = C.id_seq++;
     sprintf(new_client->nickname, "__new_client_%d", new_client->id);
+
+    int nickname_negotiation_status;
+    do {
+        nickname_negotiation_status = negotiate_nickname(new_client);
+    } while (nickname_negotiation_status != STAT_SUCCESS);
 
     pthread_mutex_lock(&C.clients_mutex);
     if (C.clients_len >= C.clients_size) {
@@ -190,10 +203,37 @@ int client_send_message(message_t type, char *content) {
 }
 
 void *handle_sending_messages(void *p) {
+
+    while (1) {
+        pthread_mutex_lock(&C.nickname_mutex);
+        if (strlen(C.nickname) > 0) {
+            if (client_send_message(CTOS_INTRO, C.nickname)) {
+                pthread_mutex_unlock(&C.nickname_mutex);
+                C.nickname[0] = '\0';
+                return NULL;
+            }
+
+            C.nickname[0] = '\0';
+
+            uint8_t status;
+            process_protocol_message(C.connect_socket, NULL, &status);
+            if (status == STAT_SUCCESS) {
+                C.nickname_set = 1;
+                pthread_mutex_unlock(&C.nickname_mutex);
+                C.mode = CONNECT;
+                break;
+            }
+        }
+        pthread_mutex_unlock(&C.nickname_mutex);
+    }
+
     while (1) {
         pthread_mutex_lock(&C.message_mutex);
         if (strlen(C.message) > 0) {
-            if (client_send_message(CTOS_MSG, C.message)) break;
+            if (client_send_message(CTOS_MSG, C.message)) {
+                pthread_mutex_unlock(&C.message_mutex);
+                return NULL;
+            }
         }
         C.message[0] = '\0';
         pthread_mutex_unlock(&C.message_mutex);
@@ -236,8 +276,15 @@ void *connect_to_chat(void *p) {
     pthread_create(&write_thread, NULL, handle_sending_messages, NULL);
     pthread_cleanup_push(cancel_client_write_thread, (void *)&write_thread);
 
+    int nickname_set = 0;
+    while (!nickname_set) {
+        pthread_mutex_lock(&C.nickname_mutex);
+        if (C.nickname_set) nickname_set = 1;
+        pthread_mutex_unlock(&C.nickname_mutex);
+    }
+
     while (1) {
-        process_protocol_message(C.connect_socket, NULL);
+        process_protocol_message(C.connect_socket, NULL, NULL);
         pthread_testcancel();
     }
 

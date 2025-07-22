@@ -7,7 +7,9 @@ typedef enum {
     UNDEFINED,
     PREPARE_HOST,
     HOST,
+    HOST_NICKNAME_NEGOTIATION,
     PREPARE_CONNECT,
+    CONNECT_NICKNAME_NEGOTIATION,
     CONNECT,
 } chat_mode;
 
@@ -35,7 +37,10 @@ struct chat_cfg {
     int rows;
     int cols;
 
-    char username[32];
+    int nickname_set;
+    pthread_mutex_t nickname_mutex;
+    char nickname[32];
+    char nickname_field[32];
     char current_message[1024];
     pthread_mutex_t message_mutex;
     char message[1024];

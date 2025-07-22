@@ -106,7 +106,7 @@ void draw_participants(char **pbuf) {
             n = snprintf(pbuf[i], 32, "%d %s", (int) C.messages_len, C.messages_len == 1 ? "message" : "messages" );
         } else if (i < participants_count) {
             while (C.participants[current_participant]->disconnected) current_participant++;
-            n = snprintf(pbuf[i], 32, "%d", C.participants[current_participant]->id);
+            n = snprintf(pbuf[i], 32, "%s", C.participants[current_participant]->nickname);
             current_participant++;
         } else {
             n = 0;
@@ -151,6 +151,21 @@ void draw_chatroom_ui(abuf *ab) {
     // }
 }
 
+void draw_nickname_negotiation_menu(abuf *ab) {
+
+    int mid = C.rows / 2;
+    char buf[64];
+    sprintf(buf, "Enter nickname: %s", C.nickname_field);
+
+    for (int i = 0; i < C.rows; i++) {
+        if (i == mid) {
+            draw_centered(ab, buf, strlen(buf));
+        } else {
+            ab_append(ab, "\r\n", 2);
+        }
+    }
+}
+
 void draw_interface(abuf *ab) {
 
     switch (C.mode) {
@@ -163,8 +178,14 @@ void draw_interface(abuf *ab) {
         case HOST:
             draw_chatroom_ui(ab);
             break;
+        case HOST_NICKNAME_NEGOTIATION:
+            draw_nickname_negotiation_menu(ab);
+            break;
         case PREPARE_CONNECT:
             draw_prepare_connect_menu(ab);
+            break;
+        case CONNECT_NICKNAME_NEGOTIATION:
+            draw_nickname_negotiation_menu(ab);
             break;
         case CONNECT:
             draw_chatroom_ui(ab);

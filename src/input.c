@@ -6,6 +6,7 @@
 #include "log.h"
 #include <errno.h>
 #include "network.h"
+#include "proto.h"
 #include "state.h"
 
 #define CTRL_KEY(k) ((k) & 0x1f)
@@ -54,7 +55,7 @@ void process_keypress_prepare_host_mode(int key) {
             break;
         case '\r':
             pthread_create(&C.accept_thread, NULL, host_chat, NULL);
-            C.mode = HOST;
+            C.mode = HOST_NICKNAME_NEGOTIATION;
             break;
         default:
             break;
@@ -67,11 +68,43 @@ void process_keypress_prepare_connect_mode(int key) {
             C.mode = UNDEFINED;
             break;
         case '\r':
-            C.mode = CONNECT;
+            C.mode = CONNECT_NICKNAME_NEGOTIATION;
             pthread_create(&C.connect_thread, NULL, connect_to_chat, NULL);
             break;
         default:
             break;
+    }
+}
+
+void process_nickname_typing(int key) {
+    int current_message_len = strlen(C.nickname_field);
+
+    if (key == '\r') {
+        if (current_message_len > 0) {
+            pthread_mutex_lock(&C.nickname_mutex);
+            memcpy(C.nickname, C.nickname_field, NN_LEN);
+            C.nickname_field[0] = '\0';
+            pthread_mutex_unlock(&C.nickname_mutex);
+        }
+    } else if (key == 127) {
+        C.nickname_field[current_message_len - 1] = '\0';
+    } else if (current_message_len >= NN_LEN - 1) {
+        return;
+    } else {
+        C.nickname_field[current_message_len] = key;
+        C.nickname_field[current_message_len + 1] = '\0';
+    }
+}
+
+void process_keypress_nickname_negotiation_mode(int key) {
+    if (key == '\r' || (32 <= key && key <= 127)) {
+        process_nickname_typing(key);
+    } else {
+        switch (key) {
+            case CTRL_KEY('q'):
+                C.mode = UNDEFINED;
+                break;
+        }
     }
 }
 
@@ -140,11 +173,17 @@ void process_keypress() {
         case PREPARE_HOST:
             process_keypress_prepare_host_mode(key);
             break;
+        case HOST_NICKNAME_NEGOTIATION:
+            process_keypress_nickname_negotiation_mode(key);
+            break;
         case HOST:
             process_keypress_host_mode(key);
             break;
         case PREPARE_CONNECT:
             process_keypress_prepare_connect_mode(key);
+            break;
+        case CONNECT_NICKNAME_NEGOTIATION:
+            process_keypress_nickname_negotiation_mode(key);
             break;
         case CONNECT:
             process_keypress_connect_mode(key);
