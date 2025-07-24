@@ -28,6 +28,7 @@ void chat_init() {
     C.messages = NULL;
     C.messages_len = 0;
     C.messages_size = 0;
+    C.message_offset = 0;
     pthread_mutex_init(&C.message_mutex, NULL);
 
     C.participants = NULL;

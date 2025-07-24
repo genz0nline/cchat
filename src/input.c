@@ -76,83 +76,67 @@ void process_keypress_prepare_connect_mode(int key) {
     }
 }
 
-void process_nickname_typing(int key) {
-    int current_message_len = strlen(C.nickname_field);
+void process_field_typing(int key, char *field, char *result, pthread_mutex_t *mutex) {
+    int current_len = strlen(field);
 
     if (key == '\r') {
-        if (current_message_len > 0) {
-            pthread_mutex_lock(&C.nickname_mutex);
-            memcpy(C.nickname, C.nickname_field, NN_LEN);
-            C.nickname_field[0] = '\0';
-            pthread_mutex_unlock(&C.nickname_mutex);
+        if (current_len > 0) {
+            pthread_mutex_lock(mutex);
+            memcpy(result, field, current_len + 1);
+            field[0] = '\0';
+            pthread_mutex_unlock(mutex);
         }
     } else if (key == 127) {
-        C.nickname_field[current_message_len - 1] = '\0';
-    } else if (current_message_len >= NN_LEN - 1) {
+        field[current_len - 1] = '\0';
+    } else if (current_len >= 1023) {
         return;
     } else {
-        C.nickname_field[current_message_len] = key;
-        C.nickname_field[current_message_len + 1] = '\0';
+        field[current_len] = key;
+        field[current_len + 1] = '\0';
     }
 }
 
 void process_keypress_nickname_negotiation_mode(int key) {
     if (key == '\r' || (32 <= key && key <= 127)) {
-        process_nickname_typing(key);
+        process_field_typing(key, C.nickname_field, C.nickname, &C.nickname_mutex);
     } else {
         switch (key) {
             case CTRL_KEY('q'):
                 C.mode = UNDEFINED;
+                if (C.mode == CONNECT_NICKNAME_NEGOTIATION) {
+                    pthread_cancel(C.connect_thread);
+                    pthread_join(C.connect_thread, NULL);
+                } else if (C.mode == HOST_NICKNAME_NEGOTIATION) {
+                    pthread_cancel(C.accept_thread);
+                    pthread_join(C.accept_thread, NULL);
+                }
                 break;
         }
     }
 }
 
-void process_message_typing(int key) {
-    int current_message_len = strlen(C.current_message);
-
-    if (key == '\r') {
-        if (current_message_len > 0) {
-            pthread_mutex_lock(&C.message_mutex);
-            memcpy(C.message, C.current_message, current_message_len + 1);
-            C.current_message[0] = '\0';
-            pthread_mutex_unlock(&C.message_mutex);
-        }
-    } else if (key == 127) {
-        C.current_message[current_message_len - 1] = '\0';
-    } else if (current_message_len >= 1023) {
-        return;
-    } else {
-        C.current_message[current_message_len] = key;
-        C.current_message[current_message_len + 1] = '\0';
-    }
-}
-
-void process_keypress_host_mode(int key) {
+void process_keypress_in_chat(int key) {
     if (key == '\r' || (32 <= key && key <= 127)) {
-        process_message_typing(key);
+        process_field_typing(key, C.current_message, C.message, &C.message_mutex);
     } else {
         switch (key) {
             case CTRL_KEY('q'):
-                pthread_cancel(C.accept_thread);
-                pthread_join(C.accept_thread, NULL);
+                if (C.mode == HOST) {
+                    pthread_cancel(C.accept_thread);
+                    pthread_join(C.accept_thread, NULL);
+                } else if (C.mode == CONNECT) {
+                    pthread_cancel(C.connect_thread);
+                    pthread_join(C.connect_thread, NULL);
+                }
                 C.mode = UNDEFINED;
                 break;
-            default:
+            case CTRL_KEY('n'):
+                if (C.message_offset > 0) C.message_offset--;
                 break;
-        }
-    }
-}
-
-void process_keypress_connect_mode(int key) {
-    if (key == '\r' || (32 <= key && key <= 127)) {
-        process_message_typing(key);
-    } else {
-        switch (key) {
-            case CTRL_KEY('q'):
-                pthread_cancel(C.connect_thread);
-                pthread_join(C.connect_thread, NULL);
-                C.mode = UNDEFINED;
+            case CTRL_KEY('p'):
+                pthread_mutex_lock(&C.message_mutex);
+                if (C.message_offset < C.messages_len - C.rows + 1) C.message_offset++;
+                pthread_mutex_unlock(&C.message_mutex);
                 break;
             default:
                 break;
@@ -177,7 +161,7 @@ void process_keypress() {
             process_keypress_nickname_negotiation_mode(key);
             break;
         case HOST:
-            process_keypress_host_mode(key);
+            process_keypress_in_chat(key);
             break;
         case PREPARE_CONNECT:
             process_keypress_prepare_connect_mode(key);
@@ -186,7 +170,7 @@ void process_keypress() {
             process_keypress_nickname_negotiation_mode(key);
             break;
         case CONNECT:
-            process_keypress_connect_mode(key);
+            process_keypress_in_chat(key);
             break;
     }
 }

@@ -72,18 +72,24 @@ int get_participants_width() {
     return width;
 }
 
+# define MESSAGE_BUF_ROWS           (C.rows - 1)
+
 void draw_messages(char **mbuf) {
     int width = C.cols - get_participants_width();
 
     pthread_mutex_lock(&C.messages_mutex);
-    for (int i = 0; i < C.rows - 1; i++) {
-        mbuf[i] = malloc(width);
-        if (i < C.messages_len) {
-            snprintf(mbuf[i], width, "%s: %s", C.messages[i].sender_nickname, C.messages[i].content);
+
+    for (int buf_idx = MESSAGE_BUF_ROWS - 1; buf_idx >= 0; buf_idx--) {
+        mbuf[buf_idx] = malloc(width);
+
+        int mes_idx = C.messages_len - 1 + (buf_idx - MESSAGE_BUF_ROWS + 1) - C.message_offset;
+        if (mes_idx >= 0) {
+            snprintf(mbuf[buf_idx], width, "%s: %s", C.messages[mes_idx].sender_nickname, C.messages[mes_idx].content);
         } else {
-            mbuf[i][0] = '\0';
+            mbuf[buf_idx][0] = '\0';
         }
     }
+
     pthread_mutex_unlock(&C.messages_mutex);
 }
 

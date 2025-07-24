@@ -70,6 +70,7 @@ struct chat_cfg {
     ChatMessage *messages;
     size_t messages_len;
     size_t messages_size;
+    int message_offset;
 };
 
 
