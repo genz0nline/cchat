@@ -130,10 +130,18 @@ void process_keypress_in_chat(int key) {
                 }
                 C.mode = UNDEFINED;
                 break;
-            case CTRL_KEY('n'):
+            case CTRL_KEY('d'):
+                C.message_offset -= MESSAGE_BUF_ROWS;
+                if (C.message_offset < 0) C.message_offset = 0;
+                break;
+            case CTRL_KEY('u'):
+                C.message_offset += MESSAGE_BUF_ROWS;
+                if (C.message_offset > C.messages_len - C.rows + 1) C.message_offset = C.messages_len - C.rows + 1;
+                break;
+            case CTRL_KEY('j'):
                 if (C.message_offset > 0) C.message_offset--;
                 break;
-            case CTRL_KEY('p'):
+            case CTRL_KEY('k'):
                 pthread_mutex_lock(&C.message_mutex);
                 if (C.message_offset < C.messages_len - C.rows + 1) C.message_offset++;
                 pthread_mutex_unlock(&C.message_mutex);

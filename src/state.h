@@ -32,6 +32,8 @@ typedef struct ChatMessage {
     char *content;
 } ChatMessage;
 
+# define MESSAGE_BUF_ROWS           (C.rows - 1)
+
 struct chat_cfg {
     chat_mode mode;
     int rows;

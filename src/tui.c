@@ -72,8 +72,6 @@ int get_participants_width() {
     return width;
 }
 
-# define MESSAGE_BUF_ROWS           (C.rows - 1)
-
 void draw_messages(char **mbuf) {
     int width = C.cols - get_participants_width();
 
