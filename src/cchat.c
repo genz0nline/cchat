@@ -10,33 +10,6 @@
 
 struct chat_cfg C;
 
-void chat_init() {
-    C.mode = UNDEFINED;
-
-    C.current_message[0] = '\0';
-    C.message[0] = '\0';
-    C.nickname_set = 0;
-    C.nickname[0] = '\0';
-    C.nickname_field[0] = '\0';
-    pthread_mutex_init(&C.nickname_mutex, NULL);
-
-    C.clients = NULL;
-    C.clients_len = 0;
-    C.clients_size = 0;
-    C.id_seq = 1;
-
-    C.messages = NULL;
-    C.messages_len = 0;
-    C.messages_size = 0;
-    C.message_offset = 0;
-    pthread_mutex_init(&C.message_mutex, NULL);
-
-    C.participants = NULL;
-    C.participants_len = 0;
-    C.participants_size = 0;
-    pthread_mutex_init(&C.participants_mutex, NULL);
-}
-
 int main(int argc, char *argv[]) {
     int dev = 0;
 
@@ -44,7 +17,8 @@ int main(int argc, char *argv[]) {
         dev = 1;
     }
 
-    chat_init();
+    state_init();
+    atexit(state_destroy);
 
     if (log_init(dev)) {
         printf("Couldn't initialize logger\n");

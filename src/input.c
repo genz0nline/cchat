@@ -122,6 +122,7 @@ void process_keypress_in_chat(int key) {
         switch (key) {
             case CTRL_KEY('q'):
                 if (C.mode == HOST) {
+                    log_print("Canceling accept thread\n");
                     pthread_cancel(C.accept_thread);
                     pthread_join(C.accept_thread, NULL);
                 } else if (C.mode == CONNECT) {
@@ -169,6 +170,7 @@ void process_keypress() {
             process_keypress_nickname_negotiation_mode(key);
             break;
         case HOST:
+            log_print("Processing host keypress\n");
             process_keypress_in_chat(key);
             break;
         case PREPARE_CONNECT:
@@ -178,6 +180,7 @@ void process_keypress() {
             process_keypress_nickname_negotiation_mode(key);
             break;
         case CONNECT:
+            log_print("Processing connect keypress\n");
             process_keypress_in_chat(key);
             break;
     }

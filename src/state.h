@@ -75,5 +75,8 @@ struct chat_cfg {
     int message_offset;
 };
 
+void state_init();
+void state_refresh();
+void state_destroy();
 
 #endif // STATE_h_

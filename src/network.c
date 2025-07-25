@@ -28,7 +28,8 @@ int process_protocol_message(int socket, Client *client, uint8_t *status) {
 
     if ((n = read_nbytes(socket, metadata, MD_LEN)) == MD_LEN) {
         uint8_t protocol_version = metadata[0];
-        if (protocol_version != 0x01) exit(123);
+        log_print("proto_version = %u\n", protocol_version);
+        assert(protocol_version == 1);
 
         message_t type = metadata[1];
 
@@ -80,6 +81,7 @@ void cancel_clients(void *p) {
     pthread_mutex_lock(&C.clients_mutex);
     for (int i = 0; i < C.clients_len; i++) {
         if (!C.clients[i]->disconnected) {
+            log_print("Canceling client %d\n", C.clients[i]->id);
             pthread_cancel(C.clients[i]->thread);
             pthread_join(C.clients[i]->thread, NULL);
             free(C.clients[i]);
@@ -145,6 +147,7 @@ void *host_chat(void *p) {
     if (C.server_socket == -1) die("socket");
     pthread_cleanup_push(close_socket, (void *)&C.server_socket);
     pthread_cleanup_push(free_clients, NULL);
+    pthread_cleanup_push((void (*)(void *))state_refresh, NULL);
 
     log_print("Created accept socket %d\n", C.server_socket);
 
@@ -157,11 +160,6 @@ void *host_chat(void *p) {
 
     if (listen(C.server_socket, SOMAXCONN) == -1) die("listen");
     log_print("Socket %d is accepting connections\n", C.server_socket);
-
-    pthread_mutex_init(&C.clients_mutex, NULL);
-    pthread_mutex_init(&C.messages_mutex, NULL);
-    pthread_cleanup_push((void (*)(void *))pthread_mutex_destroy, &C.clients_mutex);
-    pthread_cleanup_push((void (*)(void *))pthread_mutex_destroy, &C.messages_mutex);
 
     pthread_cleanup_push(cancel_clients, NULL);
 
@@ -183,7 +181,6 @@ void *host_chat(void *p) {
         add_client(new_client_fd);
     }
 
-    pthread_cleanup_pop(1);
     pthread_cleanup_pop(1);
     pthread_cleanup_pop(1);
     pthread_cleanup_pop(1);
@@ -220,7 +217,10 @@ void *handle_sending_messages(void *p) {
             if (status == STAT_SUCCESS) {
                 C.nickname_set = 1;
                 pthread_mutex_unlock(&C.nickname_mutex);
-                C.mode = CONNECT;
+                if (C.mode == CONNECT_NICKNAME_NEGOTIATION)
+                    C.mode = CONNECT;
+                else if (C.mode == HOST_NICKNAME_NEGOTIATION)
+                    C.mode = HOST;
                 break;
             }
         }
