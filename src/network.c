@@ -67,7 +67,7 @@ void *handle_client_connection(void *p) {
     return NULL;
 }
 
-#define PORT        8000
+#define PORT        12321
 
 void close_socket(void *p) {
     int socket = *(int *)p;
