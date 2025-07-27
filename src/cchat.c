@@ -11,22 +11,17 @@
 struct chat_cfg C;
 
 int main(int argc, char *argv[]) {
-    int dev = 0;
-
-    if (argc >= 2 && *argv[1] == 'd') {
-        dev = 1;
-    }
-
-    state_init();
+    state_init(argc, argv);
     atexit(state_destroy);
 
-    if (log_init(dev)) {
+    if (log_init()) {
         printf("Couldn't initialize logger\n");
         log_cleanup();
         exit(1);
     }
     atexit(log_cleanup);
     log_print("Logger initialized\n");
+
 
     enable_raw_mode();
     log_print("Raw mode enabled\n");

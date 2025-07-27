@@ -27,9 +27,7 @@ int process_protocol_message(int socket, Client *client, uint8_t *status) {
     int n;
 
     if ((n = read_nbytes(socket, metadata, MD_LEN)) == MD_LEN) {
-        uint8_t protocol_version = metadata[0];
-        log_print("proto_version = %u\n", protocol_version);
-        assert(protocol_version == 1);
+        uint8_t protocol_version = metadata[0]; // TODO: What should I do with that?
 
         message_t type = metadata[1];
 
@@ -66,8 +64,6 @@ void *handle_client_connection(void *p) {
 
     return NULL;
 }
-
-#define PORT        12321
 
 void close_socket(void *p) {
     int socket = *(int *)p;
@@ -153,10 +149,10 @@ void *host_chat(void *p) {
 
     struct sockaddr_in addr;
     addr.sin_family = AF_INET;
-    addr.sin_port = htons(PORT);
+    addr.sin_port = htons(C.port);
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
     if (bind(C.server_socket, (struct sockaddr *)&addr, sizeof(addr)) == -1) die("bind");
-    log_print("Bound socket %d to the port %d\n", C.server_socket, PORT);
+    log_print("Bound socket %d to the port %d\n", C.server_socket, C.port);
 
     if (listen(C.server_socket, SOMAXCONN) == -1) die("listen");
     log_print("Socket %d is accepting connections\n", C.server_socket);
@@ -266,8 +262,12 @@ void *connect_to_chat(void *p) {
     if (!loopback) {
         struct sockaddr_in addr;
         addr.sin_family = AF_INET;
-        addr.sin_port = htons(PORT);
-        inet_aton("127.0.0.1", &addr.sin_addr);
+        addr.sin_port = htons(C.port);
+        if (strlen(C.host) == 0) {
+            log_print("Connection requires specifying host\n");
+            exit(EXIT_FAILURE);
+        }
+        inet_aton(C.host, &addr.sin_addr);
 
         if (connect(C.connect_socket, (struct sockaddr *)&addr, sizeof(addr)) == -1) die("connect");
     }

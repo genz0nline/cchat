@@ -1,4 +1,5 @@
 #include "log.h"
+#include "state.h"
 #include <pthread.h>
 #include <stdarg.h>
 #include <errno.h>
@@ -13,6 +14,8 @@ pthread_mutex_t log_mutex;
 
 char *log_file_path = NULL;
 char *subdir_name = "/.local/state/cchat/";
+
+extern struct chat_cfg C;
 
 int create_log_dir_if_not_exist(char *log_dir) {
     DIR *dir = opendir(log_dir);
@@ -69,11 +72,11 @@ char *get_log_file_name() {
     return buf;
 }
 
-int create_log_file(char *dir, int dev) {
+int create_log_file(char *dir) {
 
     char *file_name;
 
-    if (dev) {
+    if (C.dev) {
         file_name = "log.txt";
     } else {
         file_name = get_log_file_name();
@@ -87,7 +90,7 @@ int create_log_file(char *dir, int dev) {
     memcpy(path, dir, dir_len);
     memcpy(path + dir_len, file_name, file_name_len);
     path[dir_len + file_name_len] = '\0';
-    if (!dev)
+    if (!C.dev)
         free(file_name);
     
     FILE *fp = fopen(path, "w");
@@ -103,12 +106,12 @@ int create_log_file(char *dir, int dev) {
     return 0;
 }
 
-int log_init(int dev) {
+int log_init() {
 
     pthread_mutex_init(&log_mutex, NULL);
 
-    if (dev) {
-        if (create_log_file("./", dev)) {
+    if (C.dev) {
+        if (create_log_file("./")) {
             printf("Couldn't create log file\n");
             return 1;
         }
@@ -142,7 +145,7 @@ int log_init(int dev) {
         return 1;
     }
 
-    if (create_log_file(log_dir, dev)) {
+    if (create_log_file(log_dir)) {
         printf("Couldn't create log file\n");
         free(log_dir);
         return 1;

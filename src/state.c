@@ -1,10 +1,48 @@
 #include "state.h"
+#include "log.h"
 #include <pthread.h>
 #include <stdlib.h>
+#include <string.h>
 
 extern struct chat_cfg C;
 
-void state_init() {
+void parse_port(char *s) {
+    int port = atoi(s);
+    if (!(1 <= port && port < 65535)) {
+        log_print("invalid port %d\n", port);
+        exit(EXIT_FAILURE);
+    }
+
+    C.port = (uint16_t) port;
+
+}
+
+void parse_cli_arguements(int argc, char* argv[]) {
+    C.host[0] = '\0';
+    C.dev = 0;
+    C.port = 0;
+
+    if (argc >= 2) {
+        for (int i = 1; i < argc; i++) {
+            if (strncmp(argv[i], "H", strlen(argv[i])) == 0) {
+                if (++i >= argc) break;
+                strcpy(C.host, argv[i]);
+            } else if (strncmp(argv[i], "P", strlen(argv[i])) == 0) {
+                if (++i >= argc) break;
+                parse_port(argv[i]);
+            } else if (strncmp(argv[i], "D", strlen(argv[i])) == 0) {
+                C.dev = 1;
+            }
+        }
+    }
+
+    if (C.port == 0) C.port = 12321;
+}
+
+void state_init(int argc, char *argv[]) {
+
+    parse_cli_arguements(argc, argv);
+
     C.mode = UNDEFINED;
 
     C.current_message[0] = '\0';

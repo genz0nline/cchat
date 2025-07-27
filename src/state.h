@@ -1,6 +1,7 @@
 #ifndef STATE_h_
 #define STATE_h_
 
+#include <stdint.h>
 #include <pthread.h>
 
 typedef enum {
@@ -73,9 +74,13 @@ struct chat_cfg {
     size_t messages_len;
     size_t messages_size;
     int message_offset;
+
+    int dev;
+    char host[32];
+    uint16_t port;
 };
 
-void state_init();
+void state_init(int argc, char *argv[]);
 void state_refresh();
 void state_destroy();
 
