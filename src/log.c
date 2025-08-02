@@ -64,7 +64,7 @@ char *get_log_file_name() {
     char *buf = malloc(DATE_LEN + EXTENSION_LEN + 1);
     char *time = get_current_time('T');
 
-    mempcpy(buf, time, DATE_LEN);
+    memcpy(buf, time, DATE_LEN);
     memcpy(buf + DATE_LEN, extension, EXTENSION_LEN);
     buf[DATE_LEN + EXTENSION_LEN] = '\0';
 
