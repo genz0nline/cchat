@@ -46,7 +46,7 @@ void *handle_client_connection(void *p) {
 
     Client *client = (Client *)p;
 
-    char message[1024];
+    char message[MESSAGE_LEN];
     int n;
 
     while ((n = process_protocol_message(client->socket, client, NULL)) > 0);

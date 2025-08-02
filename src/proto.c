@@ -229,7 +229,7 @@ void add_message(char *c, char *nickname) {
     ChatMessage new_message;
 
     new_message.sender_nickname = malloc(16);
-    new_message.content = malloc(1024);
+    new_message.content = malloc(MESSAGE_LEN);
 
     memcpy(new_message.content, c, strlen(c));
     memcpy(new_message.sender_nickname, nickname, strlen(nickname));

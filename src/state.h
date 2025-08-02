@@ -34,6 +34,7 @@ typedef struct ChatMessage {
 } ChatMessage;
 
 # define MESSAGE_BUF_ROWS           (C.rows - 1)
+# define MESSAGE_LEN                256
 
 struct chat_cfg {
     chat_mode mode;
@@ -44,9 +45,9 @@ struct chat_cfg {
     pthread_mutex_t nickname_mutex;
     char nickname[32];
     char nickname_field[32];
-    char current_message[1024];
+    char current_message[MESSAGE_LEN];
     pthread_mutex_t message_mutex;
-    char message[1024];
+    char message[MESSAGE_LEN];
 
     /*** For server mode ***/
     pthread_t accept_thread;

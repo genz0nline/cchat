@@ -15,6 +15,25 @@ static struct termios orig_termios;
 
 extern struct chat_cfg C;
 
+void hide_cursor() {
+    abuf ab = ab_init();
+
+    ab_append(&ab, "\x1b[?25L", 6);
+
+    ab_flush(&ab);
+    ab_free(&ab);
+}
+
+void show_cursor() {
+    abuf ab = ab_init();
+
+    ab_append(&ab, "\x1b[?25H", 6);
+
+    ab_flush(&ab);
+    ab_free(&ab);
+}
+
+
 void disable_raw_mode() {
     clean_screen();
 
@@ -44,6 +63,8 @@ void enable_raw_mode() {
         log_perror("tcsetattr");
         exit(1);
     }
+
+    hide_cursor();
 }
 
 void update_screen_size() {
